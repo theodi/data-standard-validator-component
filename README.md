@@ -19,8 +19,8 @@ document.querySelector('data-standard-validator')!.config = {
 
 Documentation: **<https://theodi.github.io/data-standard-validator-component/>**
 
-- [Usage](docs/usage.md)
-- [Development](docs/development.md)
+- [Usage](https://theodi.github.io/data-standard-validator-component/usage/)
+- [Development](https://theodi.github.io/data-standard-validator-component/development/)
 
 ## Licence
 

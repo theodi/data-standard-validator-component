@@ -33,4 +33,4 @@ example records.
 - [Usage](usage.md): install it, configure it, theme it.
 - [Development](development.md): run the demo and the tests.
 
-In use: the [Social Care Data Validator](https://socialcaredata.github.io/validator/).
+See the [demo and example use](https://theodi.github.io/data-standard-validator-demo/).

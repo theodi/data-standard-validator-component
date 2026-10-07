@@ -1,0 +1,30 @@
+site_name: Data Standard Validator Component
+site_description: A web component that checks JSON and JSON-LD records against SHACL shapes in the browser.
+site_author: The Open Data Institute
+site_url: https://theodi.github.io/data-standard-validator-component/
+repo_url: https://github.com/theodi/data-standard-validator-component
+edit_uri: edit/main/docs/
+copyright: MIT licensed · © The Open Data Institute
+
+theme:
+  name: readthedocs
+  highlightjs: true
+  hljs_languages:
+    - typescript
+    - yaml
+  navigation_depth: 2
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - tables
+  - fenced_code
+  - admonition
+
+nav:
+  - Overview: index.md
+  - Usage: usage.md
+  - Development: development.md
+
+# Fail the build on broken internal links.
+strict: true

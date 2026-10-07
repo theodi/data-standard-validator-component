@@ -1,0 +1,72 @@
+{
+  "name": "@theodi/data-standard-validator-component",
+  "version": "0.1.0",
+  "description": "A web component that validates JSON and JSON-LD records against SHACL shapes in the browser, built on @theodi/data-standard-validator.",
+  "license": "MIT",
+  "author": "The Open Data Institute",
+  "homepage": "https://theodi.github.io/data-standard-validator-component/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theodi/data-standard-validator-component.git"
+  },
+  "bugs": "https://github.com/theodi/data-standard-validator-component/issues",
+  "keywords": [
+    "shacl",
+    "json-ld",
+    "validation",
+    "web-component",
+    "lit",
+    "data-standards"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "default": "./dist/config.js"
+    },
+    "./engine": {
+      "types": "./dist/engine.d.ts",
+      "default": "./dist/engine.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": [
+    "./dist/index.js",
+    "./dist/worker.js",
+    "./dist/worker-globals.js",
+    "./src/index.ts",
+    "./src/worker.ts",
+    "./src/worker-globals.ts"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --exclude '**/*.web.test.ts' --exclude '**/node_modules/**'",
+    "test:web": "vitest run test/element.web.test.ts"
+  },
+  "dependencies": {
+    "@theodi/data-standard-validator": "github:theodi/data-standard-validator#main",
+    "lit": "^3.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "playwright": "^1.55.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.0",
+    "vitest": "^2.1.8"
+  }
+}

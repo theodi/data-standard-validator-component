@@ -15,7 +15,10 @@ export interface ValidatorConfig {
    * the ref written in the first GitHub shape URL.
    */
   ref?: string
-  /** Plain-English names for the `sh:pattern` regexes the shapes use. */
+  /**
+   * Plain-English names for the `sh:pattern` regexes the shapes use, for
+   * shapes that carry no `sh:message` of their own.
+   */
   patterns?: PatternHint[]
   /** Shown in the empty editor. */
   placeholder?: string

@@ -41,6 +41,20 @@ Re-run this after each change. `--install-links` copies the package into
 `node_modules` (running `prepare`) instead of symlinking it. With a symlink,
 Vite's dev server refuses to serve the worker from outside the host's root.
 
+## Releasing
+
+Bundler hosts install from `main` and need no release. A release is for pages
+without a bundler: it builds `standalone/` (`npm run build:standalone`, which
+bundles `dist/` with esbuild) and tags a commit that carries it, so jsDelivr can
+serve it. `main` never carries `standalone/`.
+
+1. Merge to `main`.
+2. Actions → **Release** → Run workflow, with a new `version` such as `v0.2.0`.
+3. Check `https://cdn.jsdelivr.net/gh/theodi/data-standard-validator-component@v0.2.0/standalone/data-standard-validator.js` returns JavaScript.
+
+The workflow pushes a tag, so Actions needs write access to the repository and
+no tag ruleset may block `github-actions[bot]` from creating `v*` tags.
+
 ## Layout
 
 ```
@@ -53,6 +67,7 @@ src/
   config.ts             config types and URL handling (no DOM, no engine values)
   engine.ts             a resolved standard, loaded into a memoised validator
   worker.ts             where validation runs
+standalone/             the release bundle (built, never committed on main)
 demo/                   the dev and test page
 test/                   unit tests, and element.web.test.ts
 ```

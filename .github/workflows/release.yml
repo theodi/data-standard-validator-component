@@ -1,0 +1,64 @@
+name: Release
+
+# Builds the standalone bundle and tags it, so pages without a bundler can load
+# the element from jsDelivr:
+#   https://cdn.jsdelivr.net/gh/theodi/data-standard-validator-component@<version>/standalone/data-standard-validator.js
+#
+# The bundle is committed only on the tag's own commit, never on main.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Tag to create, e.g. v0.2.0'
+        required: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Check the version
+        run: |
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::version must look like v1.2.3"; exit 1; }
+      - uses: actions/checkout@v7
+      - name: Check the tag is new
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null; then
+            echo "::error::tag $VERSION already exists"; exit 1
+          fi
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run build:standalone
+      - name: Tag a commit carrying the bundle
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout --detach
+          git add -f standalone
+          git commit -m "Release $VERSION"
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "refs/tags/$VERSION"
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$VERSION" --verify-tag --generate-notes --notes "Load without a bundler:
+
+          \`\`\`html
+          <script type=\"module\" src=\"https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@${VERSION}/standalone/data-standard-validator.js\"></script>
+          \`\`\`"

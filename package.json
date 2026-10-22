@@ -52,6 +52,7 @@
   ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "build:standalone": "rm -rf standalone && esbuild data-standard-validator=dist/index.js worker=dist/worker.js --bundle --format=esm --platform=browser --target=es2022 --minify --sourcemap --outdir=standalone",
     "prepare": "npm run build",
     "dev": "vite",
     "typecheck": "tsc --noEmit",
@@ -64,6 +65,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "esbuild": "^0.25.12",
     "playwright": "^1.55.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.0",

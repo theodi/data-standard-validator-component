@@ -26,6 +26,7 @@ let server: PreviewServer
 let outDir: string
 let browser: Browser
 let page: Page
+let origin: string
 const consoleErrors: string[] = []
 
 beforeAll(async () => {
@@ -46,7 +47,8 @@ beforeAll(async () => {
     if (message.type() === 'error') consoleErrors.push(message.text())
   })
   page.on('pageerror', (error) => { consoleErrors.push(error.message) })
-  await page.goto(`http://localhost:${port}/`, { waitUntil: 'networkidle' })
+  origin = `http://localhost:${port}`
+  await page.goto(`${origin}/`, { waitUntil: 'networkidle' })
 }, 180_000)
 
 afterAll(async () => {
@@ -118,6 +120,24 @@ describe('<data-standard-validator>', () => {
     await page.click('button.clear')
     expect(await page.inputValue('[name="data"]')).toBe('')
     expect(await page.textContent('.results')).toContain('Validate a record')
+  })
+
+  test('opens on the standard and example a link names', async () => {
+    const url = (file: string): string => `${origin}/fixtures/${file}`
+    const query = new URLSearchParams({
+      shape: url('person-shape.ttl'),
+      context: url('context.jsonld'),
+      example: url('invalid.jsonld'),
+    })
+    const linked = await browser.newPage()
+    try {
+      await linked.goto(`${origin}/?${query}`)
+      await linked.waitForSelector('.verdict.fail', { timeout: 120_000 })
+      expect(await linked.inputValue('[name="example"]')).toBe(url('invalid.jsonld'))
+      expect(await linked.inputValue('[name="data"]')).toContain('postcode')
+    } finally {
+      await linked.close()
+    }
   })
 
   test('the browser logged no errors throughout', () => {

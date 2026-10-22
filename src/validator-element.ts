@@ -12,7 +12,7 @@ import { live } from 'lit/directives/live.js'
 import { unsafeHTML } from 'lit/directives/unsafe-html.js'
 import type { RunReport } from '@theodi/data-standard-validator'
 import {
-  defaultRef, exampleList, fetchUrl, resolveStandard, shapesRepo,
+  defaultRef, exampleList, fetchUrl, matchLink, parseLinkParams, resolveStandard, shapesRepo,
   type StandardConfig, type ValidatorConfig,
 } from './config.js'
 import { highlightJson } from './highlight.js'
@@ -65,6 +65,8 @@ export class DataStandardValidator extends LitElement {
   // Only the latest example pick may fill the editor, however the fetches finish.
   private exampleToken = 0
   private restored = false
+  // The page's link picks the starting standard once; a later config does not re-apply it.
+  private linked = false
 
   constructor () {
     super()
@@ -97,6 +99,7 @@ export class DataStandardValidator extends LitElement {
       this.exampleUrl = ''
       this.ref = this.config !== undefined ? defaultRef(this.config) ?? '' : ''
       if (!this.restored) this.restoreText()
+      if (!this.linked) this.applyLink()
     }
   }
 
@@ -119,6 +122,26 @@ export class DataStandardValidator extends LitElement {
     } catch {
       // Private browsing, or storage disabled. Not worth mentioning.
     }
+  }
+
+  /** Open on the standard and example the page's query string names, if any. */
+  private applyLink (): void {
+    this.linked = true
+    const config = this.config
+    if (config === undefined || config.urlParams === false) return
+    const link = parseLinkParams(location.search)
+    // Relative links resolve against the page, as the config's own URLs do.
+    const absolute = (url: string): string => new URL(url, location.href).href
+    const match = matchLink(config, {
+      shapes: link.shapes.map(absolute),
+      ...(link.context !== undefined ? { context: absolute(link.context) } : {}),
+      ...(link.example !== undefined ? { example: absolute(link.example) } : {}),
+    })
+    if (!match) return
+    this.standardIndex = match.standardIndex
+    if (match.ref !== undefined) this.ref = match.ref
+    // Replaces any record restored from storage: the link asked for this one.
+    if (match.example !== undefined) this.loadExample(match.example)
   }
 
   // -------------------------------------------------------------------------
@@ -255,7 +278,10 @@ export class DataStandardValidator extends LitElement {
   }
 
   private onExample (event: Event): void {
-    const url = (event.target as HTMLSelectElement).value
+    this.loadExample((event.target as HTMLSelectElement).value)
+  }
+
+  private loadExample (url: string): void {
     this.exampleUrl = url
     if (url === '') return
     const token = ++this.exampleToken

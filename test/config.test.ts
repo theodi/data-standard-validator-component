@@ -6,8 +6,8 @@
 
 import { describe, expect, test } from 'vitest'
 import {
-  defaultRef, exampleList, fetchUrl, parseGitHubUrl, resolveStandard, shapesRepo,
-  type ValidatorConfig,
+  defaultRef, exampleList, fetchUrl, matchLink, parseGitHubUrl, parseLinkParams, resolveStandard,
+  shapesRepo, type ValidatorConfig,
 } from '../src/config.js'
 
 const blob = 'https://github.com/o/r/blob/main/dir/shape.ttl'
@@ -67,5 +67,67 @@ describe('a config', () => {
 
   test('names a bare example URL after its file', () => {
     expect(exampleList(standard).map((e) => e.name)).toEqual(['valid thing', 'Named'])
+  })
+})
+
+describe('a link to the page', () => {
+  const shape = (name: string): string => `https://github.com/o/r/blob/main/${name}/shape.ttl`
+  const context = (name: string): string => `https://github.com/o/r/blob/main/${name}/context.jsonld`
+  const example = (name: string): string => `https://github.com/o/examples/blob/main/${name}.jsonld`
+  const config: ValidatorConfig = {
+    standards: ['a', 'b'].map((name) => ({
+      name,
+      shapes: shape(name),
+      context: context(name),
+      examples: [example(`${name}-valid`), example(`${name}-full`)],
+    })),
+  }
+
+  test('reads repeated shapes, a context and an example', () => {
+    expect(parseLinkParams('?shape=s1&shape=s2&context=c&example=e'))
+      .toEqual({ shapes: ['s1', 's2'], context: 'c', example: 'e' })
+    expect(parseLinkParams('?shape=&context=')).toEqual({ shapes: [] })
+    expect(parseLinkParams('')).toEqual({ shapes: [] })
+  })
+
+  test('names nothing without parameters', () => {
+    expect(matchLink(config, { shapes: [] })).toBeUndefined()
+  })
+
+  test('picks the standard and example it names', () => {
+    expect(matchLink(config, { shapes: [shape('b')], context: context('b'), example: example('b-full') }))
+      .toEqual({ standardIndex: 1, ref: 'main', example: example('b-full') })
+  })
+
+  test('treats raw links as the page links in the config', () => {
+    const raw = 'https://raw.githubusercontent.com/o/r/main/b/shape.ttl'
+    const rawExample = 'https://raw.githubusercontent.com/o/examples/main/b-valid.jsonld'
+    expect(matchLink(config, { shapes: [raw], example: rawExample }))
+      .toEqual({ standardIndex: 1, ref: 'main', example: example('b-valid') })
+  })
+
+  test('matches at another ref, and asks for that ref', () => {
+    const tagged = 'https://github.com/o/r/blob/v1.0.0/b/shape.ttl'
+    expect(matchLink(config, { shapes: [tagged] })).toEqual({ standardIndex: 1, ref: 'v1.0.0' })
+  })
+
+  test('names nothing when the context belongs to another standard', () => {
+    expect(matchLink(config, { shapes: [shape('a')], context: context('b') })).toBeUndefined()
+  })
+
+  test('finds the standard from an example alone', () => {
+    expect(matchLink(config, { shapes: [], example: example('b-valid') }))
+      .toEqual({ standardIndex: 1, example: example('b-valid') })
+  })
+
+  test('still loads an example the config does not list', () => {
+    const other = 'https://example.org/other.jsonld'
+    expect(matchLink(config, { shapes: [shape('a')], example: other }))
+      .toEqual({ standardIndex: 0, ref: 'main', example: other })
+  })
+
+  test('asks for no ref when nothing is versioned', () => {
+    const offline = { standards: [{ name: 'Local', shapes: 'https://example.org/s.ttl' }] }
+    expect(matchLink(offline, { shapes: ['https://example.org/s.ttl'] })).toEqual({ standardIndex: 0 })
   })
 })

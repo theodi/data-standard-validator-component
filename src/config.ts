@@ -24,6 +24,11 @@ export interface ValidatorConfig {
   placeholder?: string
   /** localStorage key for the last record; `false` turns persistence off. */
   storageKey?: string | false
+  /**
+   * Read `shape`, `context` and `example` from the page's query string on
+   * load, to open on that standard and example. Defaults to true.
+   */
+  urlParams?: boolean
 }
 
 export interface StandardConfig {
@@ -110,4 +115,64 @@ export function exampleList (standard: StandardConfig): { name: string, url: str
   return (standard.examples ?? []).map((example) => typeof example === 'string'
     ? { name: decodeURIComponent(example.replace(/[?#].*$/, '').replace(/^.*\//, '').replace(/\.[^.]+$/, '')), url: example }
     : example)
+}
+
+/** What a link to the page asks for: `?shape=...&context=...&example=...`. */
+export interface LinkParams { shapes: string[], context?: string, example?: string }
+
+/** The standard (by index), shapes ref and example a link resolves to. */
+export interface LinkMatch { standardIndex: number, ref?: string, example?: string }
+
+export function parseLinkParams (search: string): LinkParams {
+  const params = new URLSearchParams(search)
+  const context = params.get('context')
+  const example = params.get('example')
+  // Repeated `shape=` covers a standard whose shapes are several files.
+  const shapes = params.getAll('shape').filter((url) => url !== '')
+  return {
+    shapes,
+    ...(context !== null && context !== '' ? { context } : {}),
+    ...(example !== null && example !== '' ? { example } : {}),
+  }
+}
+
+/*
+ * GitHub files are the same file at any ref and through either host: a link
+ * at a tag still names the standard configured at `main`.
+ */
+function sameFile (a: string, b: string): boolean {
+  const fa = parseGitHubUrl(a)
+  const fb = parseGitHubUrl(b)
+  if (fa && fb) return fa.owner === fb.owner && fa.repo === fb.repo && fa.path === fb.path
+  return fetchUrl(a) === fetchUrl(b)
+}
+
+/** The configured standard a link names, or undefined when it names none. */
+export function matchLink (config: ValidatorConfig, link: LinkParams): LinkMatch | undefined {
+  const { shapes, context, example } = link
+  if (shapes.length === 0 && context === undefined && example === undefined) return undefined
+  const hasExample = (standard: StandardConfig, url: string): boolean =>
+    exampleList(standard).some((e) => sameFile(e.url, url))
+  const standardIndex = config.standards.findIndex((standard) => {
+    if (shapes.length === 0 && context === undefined) return hasExample(standard, example!)
+    return shapes.every((url) => shapeList(standard).some((s) => sameFile(s, url))) &&
+      (context === undefined || (standard.context !== undefined && sameFile(standard.context, context)))
+  })
+  if (standardIndex === -1) return undefined
+  const standard = config.standards[standardIndex]!
+  // The ref box applies to shapes and contexts only; an example's ref says nothing about it.
+  const ref = defaultRef(config) === undefined
+    ? undefined
+    : [...shapes, ...(context !== undefined ? [context] : [])]
+        .map((url) => parseGitHubUrl(url)?.ref)
+        .find((r) => r !== undefined)
+  // The configured URL, so the picker shows it selected; an unlisted one still loads.
+  const exampleUrl = example === undefined
+    ? undefined
+    : exampleList(standard).find((e) => sameFile(e.url, example))?.url ?? example
+  return {
+    standardIndex,
+    ...(ref !== undefined ? { ref } : {}),
+    ...(exampleUrl !== undefined ? { example: exampleUrl } : {}),
+  }
 }

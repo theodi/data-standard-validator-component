@@ -55,6 +55,7 @@ screens the panes stack.
 | `patterns` | Plain-English names for the `sh:pattern` regexes the shapes use: `{ pattern, description, example? }`. Used only when the shape has no `sh:message` of its own. |
 | `placeholder` | Text shown in the empty editor. |
 | `storageKey` | localStorage key for the last record. `false` turns this off. |
+| `urlParams` | Read `shape`, `context` and `example` from the page's query string (see below). On by default; `false` turns it off. |
 
 `StandardConfig`:
 
@@ -70,6 +71,27 @@ GitHub page links (`github.com/<owner>/<repo>/blob/<ref>/...`) are fetched
 from `raw.githubusercontent.com`, which is the only GitHub host that allows
 cross-origin requests. When any shape comes from GitHub, an **Advanced** box
 lets the person change the ref. Other URLs are fetched exactly as written.
+
+## Linking to a standard
+
+A link can open the page on a given standard and example:
+
+```text
+https://your.site/?shape=<shape URL>&context=<context URL>&example=<example URL>
+```
+
+- `shape` and `context` pick the configured standard with those files. Repeat
+  `shape=` for a standard with several shape files. Either one is enough.
+- `example` is loaded into the editor and validated straight away. On its own
+  it picks the standard that lists it. An example the config does not list is
+  still loaded.
+- GitHub page and raw links count as the same file. A shape or context link at
+  another ref (`blob/v1.0.0/...`) matches the standard and sets the shapes
+  version to that ref.
+- Relative URLs resolve against the page. Encode a URL that contains `&` or `#`
+  (`encodeURIComponent`).
+
+Set `urlParams: false` if the page uses these query names for something else.
 
 ## Theming
 

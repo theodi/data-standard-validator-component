@@ -27,6 +27,37 @@ export default defineConfig({
 })
 ```
 
+## Without a bundler
+
+Each release also carries a standalone build, with Lit and the validation
+engine bundled in. A plain HTML page, or a static site such as Jekyll, can
+load it from jsDelivr and needs no `npm` at all:
+
+```html
+<data-standard-validator></data-standard-validator>
+
+<script type="module">
+  import 'https://cdn.jsdelivr.net/gh/theodi/data-standard-validator-component@v0.2.0/standalone/data-standard-validator.js'
+
+  document.querySelector('data-standard-validator').config = {
+    standards: [{ name: 'Person', shapes: 'https://example.org/person.ttl' }],
+  }
+</script>
+```
+
+Pin an exact version: a tag never changes, so jsDelivr can cache it for
+good. The [releases](https://github.com/theodi/data-standard-validator-component/releases)
+list the versions.
+
+The worker (`worker.js`, beside the bundle) comes from jsDelivr too. Browsers
+refuse to start a worker from another origin, so when the element finds it was
+loaded from one it starts the worker through a small `blob:` script that imports
+it. A page with a Content Security Policy needs `worker-src blob:` and
+`script-src https://cdn.jsdelivr.net` for that.
+
+You can also host the two files yourself: copy `standalone/` from the release
+tag next to your page and import `data-standard-validator.js` from there.
+
 ## Use
 
 Importing the package defines the element. You then set its `config`

@@ -20,6 +20,13 @@ document.querySelector('data-standard-validator')!.config = {
 }
 ```
 
+Without a bundler, load a release from jsDelivr instead
+([details](https://theodi.github.io/data-standard-validator-component/usage/#without-a-bundler)):
+
+```html
+<script type="module" src="https://cdn.jsdelivr.net/gh/theodi/data-standard-validator-component@v0.2.0/standalone/data-standard-validator.js"></script>
+```
+
 Documentation: **<https://theodi.github.io/data-standard-validator-component/>**
 
 - [Usage](https://theodi.github.io/data-standard-validator-component/usage/)

@@ -22,6 +22,29 @@ import type { ValidateRequest, WorkerResponse } from './worker.js'
 
 const DEFAULT_STORAGE_KEY = 'data-standard-validator:last'
 
+/*
+ * The standalone bundle is loaded from a CDN, and browsers refuse to start a
+ * worker from another origin. A worker made from a blob has the page's origin,
+ * and it may import a script that is served with CORS, so the blob just
+ * imports the real worker sitting beside this module.
+ *
+ * The URL is built by string, not `new URL('./worker.js', import.meta.url)`, so
+ * that bundlers do not mistake it for a second worker or asset to emit. The blob
+ * URL is never revoked: it is a few bytes, and the worker may still be fetching it.
+ */
+function isCrossOrigin (): boolean {
+  // webpack rewrites a bare import.meta.url to the file:// path it built from;
+  // that is a bundled host page, not a CDN.
+  const here = new URL(import.meta.url)
+  return (here.protocol === 'http:' || here.protocol === 'https:') && here.origin !== location.origin
+}
+
+function crossOriginWorker (): Worker {
+  const href = import.meta.url.replace(/[^/]*$/, 'worker.js')
+  const shim = new Blob([`import ${JSON.stringify(href)}\n`], { type: 'text/javascript' })
+  return new Worker(URL.createObjectURL(shim), { type: 'module' })
+}
+
 type Results =
   | { kind: 'info' | 'error', text: string }
   | { kind: 'report', report: RunReport, label: RunLabel }
@@ -151,7 +174,11 @@ export class DataStandardValidator extends LitElement {
   private startWorker (): void {
     if (this.worker) return
     this.workerFailure = undefined
-    const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' })
+    // The literal `new Worker(new URL(...))` stays as it is: that is the pattern
+    // Vite and webpack recognise when they bundle the worker for a host page.
+    const worker = isCrossOrigin()
+      ? crossOriginWorker()
+      : new Worker(new URL('./worker.js', import.meta.url), { type: 'module' })
     // Deliberately not preventDefault(): the error should still reach the console.
     worker.addEventListener('error', (event: ErrorEvent) => {
       this.workerFailure = event.message !== '' ? event.message : 'the worker script failed to load'

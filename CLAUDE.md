@@ -16,9 +16,13 @@ npm run test:web     # real Chromium against a production build of demo/
 
 ## Things you cannot infer from the code
 
-**Nothing about a particular standard belongs here:** no names, URLs, copy or
-storage keys. All of that goes in the host's config. Wording of issues
-belongs in the engine.
+**Nothing about a particular standard belongs here:** no names, URLs or
+copy. All of that goes in the host's config. Wording of issues belongs in the
+engine.
+
+**Records are never stored in the browser.** They may contain personal data,
+so nothing typed or loaded into the element goes to `localStorage`,
+`sessionStorage`, IndexedDB or cookies - not even behind an option.
 
 **Distributed as a git dependency, not via a registry.** Hosts install
 `github:theodi/data-standard-validator-component#main`, and `prepare` builds

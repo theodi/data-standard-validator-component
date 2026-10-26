@@ -22,8 +22,6 @@ export interface ValidatorConfig {
   patterns?: PatternHint[]
   /** Shown in the empty editor. */
   placeholder?: string
-  /** localStorage key for the last record; `false` turns persistence off. */
-  storageKey?: string | false
   /**
    * Read `shape`, `context` and `example` from the page's query string on
    * load, to open on that standard and example. Defaults to true.

@@ -20,8 +20,6 @@ import { banner, flaggedLines, renderReport, type RunLabel } from './report.js'
 import { styles } from './styles.js'
 import type { ValidateRequest, WorkerResponse } from './worker.js'
 
-const DEFAULT_STORAGE_KEY = 'data-standard-validator:last'
-
 /*
  * The standalone bundle is loaded from a CDN, and browsers refuse to start a
  * worker from another origin. A worker made from a blob has the page's origin,
@@ -87,7 +85,6 @@ export class DataStandardValidator extends LitElement {
   private inFlight: RunLabel = { standard: '' }
   // Only the latest example pick may fill the editor, however the fetches finish.
   private exampleToken = 0
-  private restored = false
   // The page's link picks the starting standard once; a later config does not re-apply it.
   private linked = false
 
@@ -121,30 +118,12 @@ export class DataStandardValidator extends LitElement {
       this.standardIndex = 0
       this.exampleUrl = ''
       this.ref = this.config !== undefined ? defaultRef(this.config) ?? '' : ''
-      if (!this.restored) this.restoreText()
       if (!this.linked) this.applyLink()
     }
   }
 
   protected override updated (): void {
     this.syncScroll()
-  }
-
-  private get storageKey (): string | undefined {
-    const key = this.config?.storageKey
-    return key === false ? undefined : key ?? DEFAULT_STORAGE_KEY
-  }
-
-  private restoreText (): void {
-    this.restored = true
-    const key = this.storageKey
-    if (key === undefined) return
-    try {
-      const saved = localStorage.getItem(key)
-      if (saved !== null && saved !== '') this.text = saved
-    } catch {
-      // Private browsing, or storage disabled. Not worth mentioning.
-    }
   }
 
   /** Open on the standard and example the page's query string names, if any. */
@@ -163,7 +142,6 @@ export class DataStandardValidator extends LitElement {
     if (!match) return
     this.standardIndex = match.standardIndex
     if (match.ref !== undefined) this.ref = match.ref
-    // Replaces any record restored from storage: the link asked for this one.
     if (match.example !== undefined) this.loadExample(match.example)
   }
 
@@ -222,14 +200,6 @@ export class DataStandardValidator extends LitElement {
     if (this.text.trim() === '') {
       this.results = { kind: 'info', text: 'Paste a record above, or load one of the examples.' }
       return
-    }
-    const key = this.storageKey
-    if (key !== undefined) {
-      try {
-        localStorage.setItem(key, this.text)
-      } catch {
-        // As above.
-      }
     }
     // Clear first: leaving the previous run's issues on screen while a new one
     // is in flight invites people to act on stale advice.

@@ -85,7 +85,6 @@ screens the panes stack.
 | `ref` | Git ref to read GitHub-hosted shapes and contexts at. Defaults to the ref in the first GitHub shape URL. |
 | `patterns` | Plain-English names for the `sh:pattern` regexes the shapes use: `{ pattern, description, example? }`. Used only when the shape has no `sh:message` of its own. |
 | `placeholder` | Text shown in the empty editor. |
-| `storageKey` | localStorage key for the last record. `false` turns this off. |
 | `urlParams` | Read `shape`, `context` and `example` from the page's query string (see below). On by default; `false` turns it off. |
 
 `StandardConfig`:

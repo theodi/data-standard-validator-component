@@ -43,15 +43,21 @@ Vite's dev server refuses to serve the worker from outside the host's root.
 
 ## Releasing
 
-A release publishes the package to npm. `prepublishOnly` builds `dist/` and
+A release publishes the package to npm as
+[`@theodi/data-standard-validator-component`](https://www.npmjs.com/package/@theodi/data-standard-validator-component).
+`prepublishOnly` builds `dist/` and
 `standalone/` (`npm run build:standalone`, which bundles `dist/` with esbuild),
 so pages without a bundler can load it from jsDelivr's npm mirror. Neither is
 ever committed.
 
 1. Bump `version` in `package.json` and merge to `main`.
-2. Create a GitHub release whose tag is `v` plus that version, such as `v0.3.0`.
+2. Create a GitHub release whose tag is `v` plus that version, such as `v1.0.0`.
    `.github/workflows/cd.yml` checks the two match, tests, and publishes.
-3. Check `https://cdn.jsdelivr.net/npm/@theodi/data-standard-validator-component@0.3.0/standalone/data-standard-validator.js` returns JavaScript.
+3. Check the Release workflow passed and the new version is listed on
+   [npm](https://www.npmjs.com/package/@theodi/data-standard-validator-component?activeTab=versions).
+4. Update the pinned version in the jsDelivr snippets in `README.md` and
+   `docs/usage.md`.
+5. Check `https://cdn.jsdelivr.net/npm/@theodi/data-standard-validator-component@1.0.0/standalone/data-standard-validator.js` returns JavaScript.
 
 The workflow publishes through npm trusted publishing, so it needs no token.
 The package on npmjs.com must trust this repository, `cd.yml` and the `npm`

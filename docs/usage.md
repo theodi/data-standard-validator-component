@@ -2,6 +2,9 @@
 
 ## Install
 
+The package is published on npm as
+[`@theodi/data-standard-validator-component`](https://www.npmjs.com/package/@theodi/data-standard-validator-component):
+
 ```bash
 npm install @theodi/data-standard-validator-component
 ```
@@ -34,7 +37,7 @@ load it from jsDelivr and needs no `npm` at all:
 <data-standard-validator></data-standard-validator>
 
 <script type="module">
-  import 'https://cdn.jsdelivr.net/npm/@theodi/data-standard-validator-component@0.3.0/standalone/data-standard-validator.js'
+  import 'https://cdn.jsdelivr.net/npm/@theodi/data-standard-validator-component@1.0.0/standalone/data-standard-validator.js'
 
   document.querySelector('data-standard-validator').config = {
     standards: [{ name: 'Person', shapes: 'https://example.org/person.ttl' }],

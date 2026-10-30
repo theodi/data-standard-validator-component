@@ -43,17 +43,19 @@ Vite's dev server refuses to serve the worker from outside the host's root.
 
 ## Releasing
 
-Bundler hosts install from `main` and need no release. A release is for pages
-without a bundler: it builds `standalone/` (`npm run build:standalone`, which
-bundles `dist/` with esbuild) and tags a commit that carries it, so jsDelivr can
-serve it. `main` never carries `standalone/`.
+A release publishes the package to npm. `prepublishOnly` builds `dist/` and
+`standalone/` (`npm run build:standalone`, which bundles `dist/` with esbuild),
+so pages without a bundler can load it from jsDelivr's npm mirror. Neither is
+ever committed.
 
-1. Merge to `main`.
-2. Actions → **Release** → Run workflow, with a new `version` such as `v0.2.0`.
-3. Check `https://cdn.jsdelivr.net/gh/theodi/data-standard-validator-component@v0.2.0/standalone/data-standard-validator.js` returns JavaScript.
+1. Bump `version` in `package.json` and merge to `main`.
+2. Create a GitHub release whose tag is `v` plus that version, such as `v0.3.0`.
+   `.github/workflows/cd.yml` checks the two match, tests, and publishes.
+3. Check `https://cdn.jsdelivr.net/npm/@theodi/data-standard-validator-component@0.3.0/standalone/data-standard-validator.js` returns JavaScript.
 
-The workflow pushes a tag, so Actions needs write access to the repository and
-no tag ruleset may block `github-actions[bot]` from creating `v*` tags.
+The workflow publishes through npm trusted publishing, so it needs no token.
+The package on npmjs.com must trust this repository, `cd.yml` and the `npm`
+environment.
 
 ## Layout
 
@@ -67,7 +69,7 @@ src/
   config.ts             config types and URL handling (no DOM, no engine values)
   engine.ts             a resolved standard, loaded into a memoised validator
   worker.ts             where validation runs
-standalone/             the release bundle (built, never committed on main)
+standalone/             the no-bundler build, published to npm (never committed)
 demo/                   the dev and test page
 test/                   unit tests, and element.web.test.ts
 ```

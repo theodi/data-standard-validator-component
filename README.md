@@ -9,7 +9,7 @@ See the [example project](https://github.com/theodi/data-standard-validator-demo
 and its [live demo](https://theodi.github.io/data-standard-validator-demo/).
 
 ```bash
-npm install github:theodi/data-standard-validator-component
+npm install @theodi/data-standard-validator-component
 ```
 
 ```ts
@@ -24,7 +24,7 @@ Without a bundler, load a release from jsDelivr instead
 ([details](https://theodi.github.io/data-standard-validator-component/usage/#without-a-bundler)):
 
 ```html
-<script type="module" src="https://cdn.jsdelivr.net/gh/theodi/data-standard-validator-component@v0.2.0/standalone/data-standard-validator.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@theodi/data-standard-validator-component@0.3.0/standalone/data-standard-validator.js"></script>
 ```
 
 Documentation: **<https://theodi.github.io/data-standard-validator-component/>**

@@ -1,8 +1,8 @@
 {
   "name": "@theodi/data-standard-validator-component",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "A web component that validates JSON and JSON-LD records against SHACL shapes in the browser, built on @theodi/data-standard-validator.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "The Open Data Institute",
   "homepage": "https://theodi.github.io/data-standard-validator-component/",
   "repository": {

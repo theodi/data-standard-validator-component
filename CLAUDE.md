@@ -24,8 +24,10 @@ engine.
 so nothing typed or loaded into the element goes to `localStorage`,
 `sessionStorage`, IndexedDB or cookies - not even behind an option.
 
-**Published to npm by a GitHub release** (`.github/workflows/cd.yml`). The
-release tag must match `version` in package.json. `prepublishOnly` builds
+**Published to npm by a GitHub release** (`.github/workflows/cd.yml`) as
+[@theodi/data-standard-validator-component](https://www.npmjs.com/package/@theodi/data-standard-validator-component).
+The release tag must match `version` in package.json. The jsDelivr snippets in
+README.md and docs/usage.md pin a version; bump them with each release. `prepublishOnly` builds
 `dist/` and `standalone/`, which are never committed. `prepare` still builds
 `dist/` so a git install or a clean clone works; keep it working.
 

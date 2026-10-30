@@ -30,6 +30,9 @@ example records.
 </script>
 ```
 
+It is published on npm as
+[`@theodi/data-standard-validator-component`](https://www.npmjs.com/package/@theodi/data-standard-validator-component).
+
 - [Usage](usage.md): install it, configure it, theme it.
 - [Development](development.md): run the demo and the tests.
 

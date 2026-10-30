@@ -1,6 +1,6 @@
 {
   "name": "@theodi/data-standard-validator-component",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "A web component that validates JSON and JSON-LD records against SHACL shapes in the browser, built on @theodi/data-standard-validator.",
   "license": "MIT",
   "author": "The Open Data Institute",
@@ -40,7 +40,8 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "src"
+    "src",
+    "standalone"
   ],
   "sideEffects": [
     "./dist/index.js",
@@ -54,13 +55,14 @@
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "build:standalone": "rm -rf standalone && esbuild data-standard-validator=dist/index.js worker=dist/worker.js --bundle --format=esm --platform=browser --target=es2022 --minify --sourcemap --outdir=standalone",
     "prepare": "npm run build",
+    "prepublishOnly": "npm run build && npm run build:standalone",
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --exclude '**/*.web.test.ts' --exclude '**/node_modules/**'",
     "test:web": "vitest run test/element.web.test.ts"
   },
   "dependencies": {
-    "@theodi/data-standard-validator": "github:theodi/data-standard-validator#main",
+    "@theodi/data-standard-validator": "^1.0.0",
     "lit": "^3.3.0"
   },
   "devDependencies": {
@@ -70,5 +72,9 @@
     "typescript": "^5.7.2",
     "vite": "^6.0.0",
     "vitest": "^2.1.8"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }

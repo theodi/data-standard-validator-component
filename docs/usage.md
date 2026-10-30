@@ -2,11 +2,8 @@
 
 ## Install
 
-The package is installed from GitHub rather than from a registry. It builds
-itself on install.
-
 ```bash
-npm install github:theodi/data-standard-validator-component
+npm install @theodi/data-standard-validator-component
 ```
 
 The package ships as unbundled ES modules, so the page needs a bundler (Vite,
@@ -37,7 +34,7 @@ load it from jsDelivr and needs no `npm` at all:
 <data-standard-validator></data-standard-validator>
 
 <script type="module">
-  import 'https://cdn.jsdelivr.net/gh/theodi/data-standard-validator-component@v0.2.0/standalone/data-standard-validator.js'
+  import 'https://cdn.jsdelivr.net/npm/@theodi/data-standard-validator-component@0.3.0/standalone/data-standard-validator.js'
 
   document.querySelector('data-standard-validator').config = {
     standards: [{ name: 'Person', shapes: 'https://example.org/person.ttl' }],
@@ -45,9 +42,9 @@ load it from jsDelivr and needs no `npm` at all:
 </script>
 ```
 
-Pin an exact version: a tag never changes, so jsDelivr can cache it for
-good. The [releases](https://github.com/theodi/data-standard-validator-component/releases)
-list the versions.
+Pin an exact version: a published version never changes, so jsDelivr can
+cache it for good. [npm](https://www.npmjs.com/package/@theodi/data-standard-validator-component)
+lists the versions.
 
 The worker (`worker.js`, beside the bundle) comes from jsDelivr too. Browsers
 refuse to start a worker from another origin, so when the element finds it was
@@ -55,8 +52,8 @@ loaded from one it starts the worker through a small `blob:` script that imports
 it. A page with a Content Security Policy needs `worker-src blob:` and
 `script-src https://cdn.jsdelivr.net` for that.
 
-You can also host the two files yourself: copy `standalone/` from the release
-tag next to your page and import `data-standard-validator.js` from there.
+You can also host the two files yourself: copy `standalone/` out of the npm
+package next to your page and import `data-standard-validator.js` from there.
 
 ## Use
 

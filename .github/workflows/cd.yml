@@ -1,0 +1,44 @@
+name: Release
+
+# Publishing is a GitHub release: tag v<version> matching package.json,
+# write the notes, publish - and this does the rest.
+#
+# The npm package carries standalone/, so pages without a bundler can load the
+# element from it:
+#   https://cdn.jsdelivr.net/npm/@theodi/data-standard-validator-component@<version>/standalone/data-standard-validator.js
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # npm trusted publishing and provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v7
+      # Node 24 ships the npm that trusted publishing needs.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - name: Tag matches package.json
+        if: github.event_name == 'release'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::release tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm publish --provenance --access public

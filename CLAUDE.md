@@ -24,9 +24,10 @@ engine.
 so nothing typed or loaded into the element goes to `localStorage`,
 `sessionStorage`, IndexedDB or cookies - not even behind an option.
 
-**Distributed as a git dependency, not via a registry.** Hosts install
-`github:theodi/data-standard-validator-component#main`, and `prepare` builds
-`dist/` on install. Keep `prepare` working from a clean clone.
+**Published to npm by a GitHub release** (`.github/workflows/cd.yml`). The
+release tag must match `version` in package.json. `prepublishOnly` builds
+`dist/` and `standalone/`, which are never committed. `prepare` still builds
+`dist/` so a git install or a clean clone works; keep it working.
 
 **`config.ts` and `engine.ts` are separate entry points (`/config`, `/engine`)
 and must not touch the DOM.** Hosts import them in Node tests. `config.ts`

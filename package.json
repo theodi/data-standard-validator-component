@@ -60,7 +60,7 @@
     "test:web": "vitest run test/element.web.test.ts"
   },
   "dependencies": {
-    "@theodi/data-standard-validator": "github:theodi/data-standard-validator#main",
+    "@theodi/data-standard-validator": "^1.0.0",
     "lit": "^3.3.0"
   },
   "devDependencies": {

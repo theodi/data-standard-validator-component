@@ -22,6 +22,7 @@ export function loadValidator (opts: LoadOptions): Promise<Validator> {
   const key = JSON.stringify([
     opts.shapes,
     opts.context ?? null,
+    opts.csvMetadata ?? null,
     (opts.patterns ?? []).map((p) => [String(p.pattern), p.description, p.example ?? null]),
   ])
   let pending = loaded.get(key)
@@ -38,6 +39,7 @@ function load (opts: LoadOptions): Promise<Validator> {
   return createValidator({
     shapes: opts.shapes,
     ...(opts.context !== undefined ? { context: opts.context } : {}),
+    ...(opts.csvMetadata !== undefined ? { csvMetadata: opts.csvMetadata } : {}),
     ...(opts.patterns !== undefined ? { patterns: opts.patterns } : {}),
     ...(opts.skolemize !== undefined ? { skolemize: opts.skolemize } : {}),
     ...(opts.fetch !== undefined ? { fetch: opts.fetch } : {}),

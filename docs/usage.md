@@ -37,7 +37,7 @@ load it from jsDelivr and needs no `npm` at all:
 <data-standard-validator></data-standard-validator>
 
 <script type="module">
-  import 'https://cdn.jsdelivr.net/npm/@theodi/data-standard-validator-component@1.0.0/standalone/data-standard-validator.js'
+  import 'https://cdn.jsdelivr.net/npm/@theodi/data-standard-validator-component@1.1.0/standalone/data-standard-validator.js'
 
   document.querySelector('data-standard-validator').config = {
     standards: [{ name: 'Person', shapes: 'https://example.org/person.ttl' }],
@@ -85,7 +85,7 @@ screens the panes stack.
 | `ref` | Git ref to read GitHub-hosted shapes and contexts at. Defaults to the ref in the first GitHub shape URL. |
 | `patterns` | Plain-English names for the `sh:pattern` regexes the shapes use: `{ pattern, description, example? }`. Used only when the shape has no `sh:message` of its own. |
 | `placeholder` | Text shown in the empty editor. |
-| `urlParams` | Read `shape`, `context` and `example` from the page's query string (see below). On by default; `false` turns it off. |
+| `urlParams` | Read `shape`, `context`, `csvw` and `example` from the page's query string (see below). On by default; `false` turns it off. |
 
 `StandardConfig`:
 
@@ -95,12 +95,54 @@ screens the panes stack.
 | `description` | Help text under the picker. |
 | `shapes` | One or more SHACL Turtle URLs, merged in order. |
 | `context` | A JSON-LD context that replaces each record's own `@context`. If you leave it out, the record's own context is used. |
-| `examples` | Example record URLs (named after their file), or `{ name, url }`. |
+| `csvMetadata` | [CSVW metadata](https://theodi.github.io/data-standard-validator/csv/) saying how a CSV file of this standard becomes RDF. Set it to offer CSV as well as JSON. |
+| `examples` | Example record URLs (named after their file), or `{ name, url }`. A URL ending in `.csv` is a CSV example; any other is JSON. The picker lists the examples of the format chosen. |
 
 GitHub page links (`github.com/<owner>/<repo>/blob/<ref>/...`) are fetched
 from `raw.githubusercontent.com`, which is the only GitHub host that allows
 cross-origin requests. When any shape comes from GitHub, an **Advanced** box
 lets the person change the ref. Other URLs are fetched exactly as written.
+
+Under the description, **Standard files** links to the standard's shapes, and
+to its context (JSON) or its CSVW mapping (CSV). GitHub files link to their
+page at the chosen ref.
+
+## CSV
+
+A standard with `csvMetadata` gets a **JSON | CSV** switch. Each format keeps
+its own text while the person switches between them (in memory only). A CSV
+example, or a dropped `.csv` file, switches to CSV by itself.
+
+```ts
+{
+  name: 'Placements',
+  shapes: 'https://github.com/example/standard/blob/main/placements/shape.ttl',
+  context: 'https://github.com/example/standard/blob/main/placements/context.jsonld',
+  csvMetadata: 'https://github.com/example/standard/blob/main/placements/csv-metadata.json',
+  examples: [
+    'https://github.com/example/standard/blob/main/examples/valid-placement.jsonld',
+    'https://github.com/example/standard/blob/main/examples/valid-placements.csv',
+  ],
+}
+```
+
+CSV data has two views:
+
+- **Table**: one row per record, the header's first line as the column name
+  and, below it, the name the CSVW mapping gives that column. Double-click a
+  cell (or press Enter or F2) to edit it; Enter or Tab saves it. Only that
+  cell's text is rewritten, so the rest of the file stays as it was. The
+  table shows the first 500 rows; every row is validated.
+- **Text**: the file as text, to paste into or edit, with the line and caret
+  position.
+
+After a run, flagged cells, rows and header cells are coloured in the table,
+and the cells are marked in the text. Clicking an issue shows its cell, and
+clicking a flagged cell picks its issue. The issues are grouped by row and
+named by the row's first cell; problems with the header are under *Columns*.
+
+The table reads the CSVW mapping itself, for the column names and the
+`dialect.delimiter`. If that fetch fails, the table still works, without them.
 
 ## Linking to a standard
 
@@ -110,11 +152,13 @@ A link can open the page on a given standard and example:
 https://your.site/?shape=<shape URL>&context=<context URL>&example=<example URL>
 ```
 
+- `csvw` picks the standard with that CSVW mapping, and opens in CSV.
+
 - `shape` and `context` pick the configured standard with those files. Repeat
   `shape=` for a standard with several shape files. Either one is enough.
 - `example` is loaded into the editor and validated straight away. On its own
   it picks the standard that lists it. An example the config does not list is
-  still loaded.
+  still loaded. A `.csv` example opens in CSV.
 - GitHub page and raw links count as the same file. A shape or context link at
   another ref (`blob/v1.0.0/...`) matches the standard and sets the shapes
   version to that ref.
@@ -158,6 +202,7 @@ import { loadValidator } from '@theodi/data-standard-validator-component/engine'
 
 const validator = await loadValidator(resolveStandard(config.standards[0], defaultRef(config)))
 const report = await validator.validate({ name: 'record.jsonld', text })
+const csvReport = await validator.validate({ name: 'records.csv', text: csv, format: 'csv' })
 ```
 
 `/config` imports only types from the engine, so a page can import it

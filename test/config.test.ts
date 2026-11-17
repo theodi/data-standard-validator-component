@@ -6,8 +6,8 @@
 
 import { describe, expect, test } from 'vitest'
 import {
-  defaultRef, exampleList, fetchUrl, matchLink, parseGitHubUrl, parseLinkParams, resolveStandard,
-  shapesRepo, type ValidatorConfig,
+  defaultRef, exampleList, fetchUrl, formatOf, formatsOf, matchLink, pageUrl, parseGitHubUrl, parseLinkParams,
+  resolveStandard, shapesRepo, standardFiles, type ValidatorConfig,
 } from '../src/config.js'
 
 const blob = 'https://github.com/o/r/blob/main/dir/shape.ttl'
@@ -70,6 +70,51 @@ describe('a config', () => {
   })
 })
 
+describe('formats', () => {
+  const csvw = 'https://github.com/o/r/blob/main/dir/csv-metadata.json'
+  const standard = {
+    name: 'Both',
+    shapes: blob,
+    context: 'https://github.com/o/r/blob/main/dir/context.jsonld',
+    csvMetadata: csvw,
+    examples: ['https://example.org/a.jsonld', 'https://example.org/b.CSV?raw=1', { name: 'C', url: 'https://example.org/c.csv' }],
+  }
+
+  test('come from the extension', () => {
+    expect(formatOf('people.csv')).toBe('csv')
+    expect(formatOf('https://example.org/x.Csv#frag')).toBe('csv')
+    expect(formatOf('record.jsonld')).toBe('json')
+    expect(formatOf('no-extension')).toBe('json')
+  })
+
+  test('CSV is offered once a standard has CSVW', () => {
+    expect(formatsOf(standard)).toEqual(['json', 'csv'])
+    expect(formatsOf({ name: 'JSON only', shapes: blob })).toEqual(['json'])
+  })
+
+  test('examples are listed by format', () => {
+    expect(exampleList(standard, 'json').map((e) => e.name)).toEqual(['a'])
+    expect(exampleList(standard, 'csv').map((e) => e.name)).toEqual(['b', 'C'])
+  })
+
+  test('the CSVW is resolved at the ref', () => {
+    expect(resolveStandard(standard, 'v2').csvMetadata).toBe('https://raw.githubusercontent.com/o/r/v2/dir/csv-metadata.json')
+  })
+
+  test('file links open GitHub pages at the ref', () => {
+    expect(pageUrl('https://raw.githubusercontent.com/o/r/main/x.ttl', 'v2')).toBe('https://github.com/o/r/blob/v2/x.ttl')
+    expect(pageUrl('https://example.org/x.ttl', 'v2')).toBe('https://example.org/x.ttl')
+  })
+
+  test('link the shapes, and the context or the CSVW by format', () => {
+    expect(standardFiles(standard, 'json', 'v2')).toEqual([
+      { label: 'Shape', ext: '.ttl', url: 'https://github.com/o/r/blob/v2/dir/shape.ttl' },
+      { label: 'Context', ext: '.jsonld', url: 'https://github.com/o/r/blob/v2/dir/context.jsonld' },
+    ])
+    expect(standardFiles(standard, 'csv').map((f) => [f.label, f.ext])).toEqual([['Shape', '.ttl'], ['CSVW mapping', '.json']])
+  })
+})
+
 describe('a link to the page', () => {
   const shape = (name: string): string => `https://github.com/o/r/blob/main/${name}/shape.ttl`
   const context = (name: string): string => `https://github.com/o/r/blob/main/${name}/context.jsonld`
@@ -109,6 +154,16 @@ describe('a link to the page', () => {
   test('matches at another ref, and asks for that ref', () => {
     const tagged = 'https://github.com/o/r/blob/v1.0.0/b/shape.ttl'
     expect(matchLink(config, { shapes: [tagged] })).toEqual({ standardIndex: 1, ref: 'v1.0.0' })
+  })
+
+  test('reads a CSVW link, and matches the standard with that CSVW', () => {
+    expect(parseLinkParams('?csvw=m.json')).toEqual({ shapes: [], csvMetadata: 'm.json' })
+    const csvw = 'https://github.com/o/r/blob/v3/b/csv-metadata.json'
+    const withCsv: ValidatorConfig = {
+      standards: config.standards.map((s) => ({ ...s, csvMetadata: `https://github.com/o/r/blob/main/${s.name}/csv-metadata.json` })),
+    }
+    expect(matchLink(withCsv, { shapes: [], csvMetadata: csvw })).toEqual({ standardIndex: 1, ref: 'v3' })
+    expect(matchLink(config, { shapes: [], csvMetadata: csvw })).toBeUndefined()
   })
 
   test('names nothing when the context belongs to another standard', () => {

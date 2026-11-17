@@ -11,10 +11,11 @@ const fixture = (file: string): string => new URL(`fixtures/${file}`, document.b
 const config: ValidatorConfig = {
   standards: [{
     name: 'Example person',
-    description: 'A person with a name, an optional age and status, and addresses with a short postcode.',
+    description: 'A person with a name, an optional age and status, and addresses with a short postcode. As JSON-LD, or as CSV with one person per row.',
     shapes: fixture('person-shape.ttl'),
     context: fixture('context.jsonld'),
-    examples: [fixture('valid.jsonld'), fixture('invalid.jsonld')],
+    csvMetadata: fixture('csv-metadata.json'),
+    examples: [fixture('valid.jsonld'), fixture('invalid.jsonld'), fixture('valid.csv'), fixture('invalid.csv')],
   }],
   patterns: [{ pattern: '^[A-Z]{2}[0-9]$', description: 'a short postcode', example: 'AB1' }],
   placeholder: 'Paste a JSON-LD person here, or load an example.',

@@ -9,7 +9,7 @@
 import './worker-globals.js'
 
 import type { PatternHint, RunReport } from '@theodi/data-standard-validator'
-import type { ResolvedStandard } from './config.js'
+import type { DataFormat, ResolvedStandard } from './config.js'
 import { loadValidator } from './engine.js'
 
 export interface ValidateRequest {
@@ -21,6 +21,8 @@ export interface ValidateRequest {
   ref?: string
   text: string
   name: string
+  /** Chosen in the toolbar, not guessed from the text: a pasted CSV has no file name. */
+  format: DataFormat
 }
 
 export type WorkerResponse =
@@ -41,7 +43,10 @@ self.addEventListener('message', (event: MessageEvent<ValidateRequest>) => {
       const key = JSON.stringify(request.standard)
       if (!seen.has(key)) {
         const at = request.ref !== undefined ? ` for ${request.ref}` : ''
-        post({ kind: 'status', id: request.id, message: `Fetching shapes${at}...` })
+        const what = request.standard.csvMetadata !== undefined && request.format === 'csv'
+          ? 'shapes and CSVW mapping'
+          : 'shapes'
+        post({ kind: 'status', id: request.id, message: `Fetching ${what}${at}...` })
         seen.add(key)
       }
       const validator = await loadValidator({
@@ -49,7 +54,7 @@ self.addEventListener('message', (event: MessageEvent<ValidateRequest>) => {
         ...(request.patterns !== undefined ? { patterns: request.patterns } : {}),
       })
       post({ kind: 'status', id: request.id, message: 'Validating...' })
-      const report = await validator.validateAll([{ name: request.name, text: request.text }])
+      const report = await validator.validateAll([{ name: request.name, text: request.text, format: request.format }])
       post({ kind: 'result', id: request.id, report })
     } catch (error) {
       post({ kind: 'error', id: request.id, message: (error as Error).message })

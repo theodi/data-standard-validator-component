@@ -160,7 +160,75 @@ select, .ref-input {
   font-size: 0.95rem;
 }
 .help { margin: 6px 0 0; font-size: 0.82rem; color: var(--text-dim); }
-.toolbar-help { flex: 1 0 100%; margin: 0; }
+.toolbar-info {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+}
+.toolbar-help { margin: 0; }
+.label {
+  display: block;
+  font-weight: 700;
+  font-size: 0.8rem;
+  margin-bottom: 4px;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* JSON | CSV. Radio inputs, so the browser gives the group its keyboard. */
+.format { flex: none; }
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 2px;
+  gap: 2px;
+}
+.segmented label {
+  position: relative;
+  padding: 5px 16px;
+  border-radius: calc(var(--radius) - 1px);
+  font-size: 0.95rem;
+  cursor: pointer;
+  color: var(--text);
+}
+.segmented label.on { background: var(--accent); color: var(--accent-text); font-weight: 700; }
+.segmented input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.segmented label:has(input:focus-visible) { outline: 2px solid var(--link); outline-offset: 2px; }
+
+.standard-files { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.standard-files .label {
+  display: inline;
+  margin: 0 4px 0 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.file-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+.file-link:hover { border-color: var(--accent); }
+.file-label { text-decoration: underline; }
+.file-ext, .file-out { font-family: var(--mono); font-size: 0.78rem; color: var(--text-dim); }
+.file-icon { width: 13px; height: 13px; fill: none; stroke: var(--text-dim); stroke-width: 1.3; stroke-linejoin: round; }
 
 .actions { display: flex; gap: 8px; }
 button {
@@ -214,6 +282,35 @@ summary:focus-visible, a:focus-visible, .issue:focus-visible {
   padding: 12px 24px 12px;
 }
 .editor-pane { border-right: 1px solid var(--border); }
+.pane-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  min-height: 2rem;
+}
+.pane-bar .pane-head { margin: 0; margin-right: auto; }
+.counts { font-size: 0.82rem; color: var(--text-dim); white-space: nowrap; }
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 2px;
+  gap: 2px;
+}
+.view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 12px;
+  font-size: 0.85rem;
+  background: transparent;
+  color: var(--text-dim);
+}
+.view-toggle button.on { background: var(--surface-2); color: var(--text); font-weight: 700; border-color: var(--border); }
+.view-toggle svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; }
 .pane-head {
   flex: none;
   font-size: 0.8rem;
@@ -297,6 +394,126 @@ summary:focus-visible, a:focus-visible, .issue:focus-visible {
 .tok-number { color: var(--syn-number); }
 .tok-literal { color: var(--syn-literal); }
 .tok-punct { color: var(--syn-punct); }
+/* An issue's text in the CSV text view. Painted under the transparent
+   textarea like the colours, so it may not change any character's width. */
+mark { background: none; color: inherit; }
+mark.cell-violation { background: var(--violation-bg); box-shadow: inset 0 -2px var(--violation-edge); }
+mark.cell-warning { background: var(--warning-bg); box-shadow: inset 0 -2px var(--warning-edge); }
+mark.empty { position: relative; background: none; box-shadow: none; }
+mark.empty::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0.6em;
+  height: 1.1em;
+  background: var(--violation-bg);
+  border-bottom: 2px solid var(--violation-edge);
+}
+mark.cell-warning.empty::after { background: var(--warning-bg); border-color: var(--warning-edge); }
+
+.editor-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--surface-2);
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.editor:has(+ .editor-foot) { border-radius: var(--radius) var(--radius) 0 0; }
+.add-row { padding: 4px 12px; font-size: 0.85rem; white-space: nowrap; }
+.add-row:disabled { opacity: 0.5; cursor: default; }
+
+/* ---- CSV table --------------------------------------------------------- */
+
+.grid-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /* So a cell scrolled into view is not left under the sticky header or row numbers. */
+  scroll-padding: 3.4rem 0 0 3.2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--surface);
+}
+.grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  font: 13px/1.4 var(--mono);
+  min-width: 100%;
+}
+.grid th, .grid td {
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.grid td {
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: cell;
+}
+.grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface-2);
+  font-weight: 700;
+  color: var(--text);
+}
+.col-title, .col-map { display: block; }
+.col-map { font-weight: 400; font-size: 0.85em; color: var(--text-dim); }
+.grid .rownum {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  text-align: right;
+  min-width: 2.5rem;
+  font-weight: 400;
+}
+.grid thead .rownum { z-index: 3; text-align: center; }
+.grid tr.flagged.violation .rownum { color: var(--violation); font-weight: 700; box-shadow: inset 3px 0 var(--violation-edge); }
+.grid tr.flagged.warning .rownum { color: var(--warning); font-weight: 700; box-shadow: inset 3px 0 var(--warning-edge); }
+.grid tr.focus td { background: var(--info-bg); }
+.grid td.flagged.violation, .grid th.flagged.violation {
+  background: var(--violation-bg);
+  color: var(--violation);
+  font-weight: 700;
+  box-shadow: inset 0 -2px var(--violation-edge);
+}
+.grid td.flagged.warning, .grid th.flagged.warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+  box-shadow: inset 0 -2px var(--warning-edge);
+}
+.grid td.focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+.grid td:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }
+.grid td.editing { padding: 0; overflow: visible; }
+.cell-input {
+  width: 100%;
+  min-width: 8rem;
+  padding: 5px 9px;
+  border: 2px solid var(--accent);
+  font: inherit;
+  background: var(--surface);
+  color: var(--text);
+}
+.cell-input:focus-visible { outline: none; }
+.empty-cell { font-family: var(--sans); font-weight: 400; opacity: 0.85; }
+.grid-empty, .grid-more { margin: 0; padding: 18px 16px; color: var(--text-dim); font-size: 0.9rem; }
+.grid-more { padding: 10px 16px; font-size: 0.82rem; }
+
 .privacy { flex: none; font-size: 0.78rem; color: var(--text-dim); margin: 6px 2px 0; }
 
 .results-scroll {
@@ -356,6 +573,7 @@ summary:focus-visible, a:focus-visible, .issue:focus-visible {
 .issue.warning { border-left-color: var(--warning-edge); }
 .issue.info { border-left-color: var(--info-edge); }
 .issue:hover { border-color: var(--accent); }
+.issue.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .issue.violation:hover { border-left-color: var(--violation-edge); }
 .issue.warning:hover { border-left-color: var(--warning-edge); }
 
@@ -399,6 +617,7 @@ summary:focus-visible, a:focus-visible, .issue:focus-visible {
 .banner.warning { background: var(--warning-bg); border-color: var(--warning-edge); }
 .banner.info { background: var(--info-bg); border-color: var(--info-edge); }
 .banner.error { background: var(--violation-bg); border-color: var(--violation-edge); }
+.banner code { font-family: var(--mono); font-size: 0.92em; }
 
 /* On narrow screens two half-width panes are unusable, and a fixed height
    would leave the editor a sliver. Stack, and let the page scroll. */
@@ -406,7 +625,11 @@ summary:focus-visible, a:focus-visible, .issue:focus-visible {
   .toolbar, .pane { padding-left: 16px; padding-right: 16px; }
   .workspace { grid-template-columns: minmax(0, 1fr); }
   .editor-pane { border-right: 0; border-bottom: 1px solid var(--border); }
-  .editor { height: 24rem; flex: none; }
+  .editor, .grid-wrap { height: 24rem; flex: none; }
+  /* Stacked, each pane is as tall as what it holds; min-height: 0 would let
+     the grid squeeze the editor pane under the results. */
+  .pane { min-height: auto; }
+  .pane-bar { flex-wrap: wrap; }
   .results-scroll { overflow: visible; }
   .field { flex: 1 1 100%; }
   .actions { flex: 1; }

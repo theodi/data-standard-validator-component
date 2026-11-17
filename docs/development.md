@@ -4,12 +4,12 @@
 npm install
 npm run dev          # the demo page, http://localhost:5173/
 npm run typecheck
-npm test             # unit tests: config, highlighting, engine (offline)
+npm test             # unit tests: config, CSV, highlighting, engine (offline)
 npm run build        # dist/, what hosts import
 ```
 
 The demo (`demo/`) has a single standard built from the fixtures in
-`demo/public/fixtures/`, so it works offline.
+`demo/public/fixtures/`, as JSON-LD and as CSV, so it works offline.
 
 ## Browser tests
 
@@ -68,10 +68,11 @@ environment.
 ```
 src/
   index.ts              defines <data-standard-validator>
-  validator-element.ts  the element: toolbar, editor, results
+  validator-element.ts  the element: toolbar, editor, CSV table, results
   report.ts             a run report, as Lit templates
   styles.ts             the shadow-root styles and theme tokens
-  highlight.ts          JSON colouring for the editor
+  highlight.ts          JSON and CSV colouring for the editor
+  csv.ts                CSV for the table: parsing, cell edits (no DOM, no engine)
   config.ts             config types and URL handling (no DOM, no engine values)
   engine.ts             a resolved standard, loaded into a memoised validator
   worker.ts             where validation runs

@@ -23,8 +23,8 @@ export interface ValidatorConfig {
   /** Shown in the empty editor. */
   placeholder?: string
   /**
-   * Read `shape`, `context` and `example` from the page's query string on
-   * load, to open on that standard and example. Defaults to true.
+   * Read `shape`, `context`, `csvw` and `example` from the page's query
+   * string on load, to open on that standard and example. Defaults to true.
    */
   urlParams?: boolean
 }
@@ -41,14 +41,25 @@ export interface StandardConfig {
    * one, the record's own `@context` is loaded instead.
    */
   context?: string
-  /** Offered under "Example". A bare URL is named after its file. */
+  /**
+   * CSVW metadata that says how a CSV file of this standard becomes RDF.
+   * The standard offers CSV only when it has one.
+   */
+  csvMetadata?: string
+  /**
+   * Offered under "Example". A bare URL is named after its file. A URL
+   * ending in `.csv` is a CSV example; anything else is JSON.
+   */
   examples?: (string | { name: string, url: string })[]
 }
+
+/** What the person is validating. An example's format comes from its extension. */
+export type DataFormat = 'json' | 'csv'
 
 export interface GitHubFile { owner: string, repo: string, ref: string, path: string }
 
 /** What `loadValidator` needs for one standard at one ref. */
-export interface ResolvedStandard { shapes: string[], context?: string }
+export interface ResolvedStandard { shapes: string[], context?: string, csvMetadata?: string }
 
 /*
  * The ref is taken to be a single path segment. A ref containing `/` cannot
@@ -83,7 +94,60 @@ export function resolveStandard (standard: StandardConfig, ref?: string): Resolv
   return {
     shapes: shapeList(standard).map((url) => fetchUrl(url, ref)),
     ...(standard.context !== undefined ? { context: fetchUrl(standard.context, ref) } : {}),
+    ...(standard.csvMetadata !== undefined ? { csvMetadata: fetchUrl(standard.csvMetadata, ref) } : {}),
   }
+}
+
+/**
+ * A URL a person can open: a GitHub file's page at `ref`, so the link shows
+ * the file people are validating against rather than a raw download.
+ */
+export function pageUrl (url: string, ref?: string): string {
+  const file = parseGitHubUrl(url)
+  if (!file) return url
+  return `https://github.com/${file.owner}/${file.repo}/blob/${ref ?? file.ref}/${file.path}`
+}
+
+function fileName (url: string): string {
+  return decodeURIComponent(url.replace(/[?#].*$/, '').replace(/^.*\//, ''))
+}
+
+function extension (url: string): string {
+  const match = /\.([^./]+)$/.exec(fileName(url))
+  return match ? match[1]!.toLowerCase() : ''
+}
+
+/** The format a URL or file name announces: CSV for `.csv`, JSON for anything else. */
+export function formatOf (url: string): DataFormat {
+  return extension(url) === 'csv' ? 'csv' : 'json'
+}
+
+/** The formats a standard accepts. JSON always; CSV once it has CSVW metadata. */
+export function formatsOf (standard: StandardConfig): DataFormat[] {
+  return standard.csvMetadata !== undefined ? ['json', 'csv'] : ['json']
+}
+
+export interface StandardFile {
+  label: 'Shape' | 'Context' | 'CSVW mapping'
+  /** `.ttl`, `.jsonld`, `.json`, as the link shows it. */
+  ext: string
+  /** The file's page, at the ref the shapes are read from. */
+  url: string
+}
+
+/**
+ * The files a standard is made of, for linking to: its shapes, and whichever
+ * of the context or the CSVW mapping applies to the format being validated.
+ */
+export function standardFiles (standard: StandardConfig, format: DataFormat, ref?: string): StandardFile[] {
+  const file = (label: StandardFile['label'], url: string): StandardFile => {
+    const ext = extension(url)
+    return { label, ext: ext !== '' ? `.${ext}` : '', url: pageUrl(url, ref) }
+  }
+  const files = shapeList(standard).map((url) => file('Shape', url))
+  if (format === 'json' && standard.context !== undefined) files.push(file('Context', standard.context))
+  if (format === 'csv' && standard.csvMetadata !== undefined) files.push(file('CSVW mapping', standard.csvMetadata))
+  return files
 }
 
 function firstGitHubShape (config: ValidatorConfig): GitHubFile | undefined {
@@ -109,14 +173,17 @@ export function shapesRepo (config: ValidatorConfig): { name: string, url: strin
   return { name, url: `https://github.com/${name}` }
 }
 
-export function exampleList (standard: StandardConfig): { name: string, url: string }[] {
-  return (standard.examples ?? []).map((example) => typeof example === 'string'
-    ? { name: decodeURIComponent(example.replace(/[?#].*$/, '').replace(/^.*\//, '').replace(/\.[^.]+$/, '')), url: example }
-    : example)
+/** The standard's examples, named; only those in `format` when it is given. */
+export function exampleList (standard: StandardConfig, format?: DataFormat): { name: string, url: string }[] {
+  return (standard.examples ?? [])
+    .map((example) => typeof example === 'string'
+      ? { name: fileName(example).replace(/\.[^.]+$/, ''), url: example }
+      : example)
+    .filter((example) => format === undefined || formatOf(example.url) === format)
 }
 
-/** What a link to the page asks for: `?shape=...&context=...&example=...`. */
-export interface LinkParams { shapes: string[], context?: string, example?: string }
+/** What a link to the page asks for: `?shape=...&context=...&csvw=...&example=...`. */
+export interface LinkParams { shapes: string[], context?: string, csvMetadata?: string, example?: string }
 
 /** The standard (by index), shapes ref and example a link resolves to. */
 export interface LinkMatch { standardIndex: number, ref?: string, example?: string }
@@ -124,12 +191,14 @@ export interface LinkMatch { standardIndex: number, ref?: string, example?: stri
 export function parseLinkParams (search: string): LinkParams {
   const params = new URLSearchParams(search)
   const context = params.get('context')
+  const csvMetadata = params.get('csvw')
   const example = params.get('example')
   // Repeated `shape=` covers a standard whose shapes are several files.
   const shapes = params.getAll('shape').filter((url) => url !== '')
   return {
     shapes,
     ...(context !== null && context !== '' ? { context } : {}),
+    ...(csvMetadata !== null && csvMetadata !== '' ? { csvMetadata } : {}),
     ...(example !== null && example !== '' ? { example } : {}),
   }
 }
@@ -147,21 +216,23 @@ function sameFile (a: string, b: string): boolean {
 
 /** The configured standard a link names, or undefined when it names none. */
 export function matchLink (config: ValidatorConfig, link: LinkParams): LinkMatch | undefined {
-  const { shapes, context, example } = link
-  if (shapes.length === 0 && context === undefined && example === undefined) return undefined
+  const { shapes, context, csvMetadata, example } = link
+  if (shapes.length === 0 && context === undefined && csvMetadata === undefined && example === undefined) return undefined
   const hasExample = (standard: StandardConfig, url: string): boolean =>
     exampleList(standard).some((e) => sameFile(e.url, url))
+  const same = (configured: string | undefined, linked: string | undefined): boolean =>
+    linked === undefined || (configured !== undefined && sameFile(configured, linked))
   const standardIndex = config.standards.findIndex((standard) => {
-    if (shapes.length === 0 && context === undefined) return hasExample(standard, example!)
+    if (shapes.length === 0 && context === undefined && csvMetadata === undefined) return hasExample(standard, example!)
     return shapes.every((url) => shapeList(standard).some((s) => sameFile(s, url))) &&
-      (context === undefined || (standard.context !== undefined && sameFile(standard.context, context)))
+      same(standard.context, context) && same(standard.csvMetadata, csvMetadata)
   })
   if (standardIndex === -1) return undefined
   const standard = config.standards[standardIndex]!
-  // The ref box applies to shapes and contexts only; an example's ref says nothing about it.
+  // The ref box applies to the standard's own files only; an example's ref says nothing about it.
   const ref = defaultRef(config) === undefined
     ? undefined
-    : [...shapes, ...(context !== undefined ? [context] : [])]
+    : [...shapes, ...[context, csvMetadata].filter((url) => url !== undefined)]
         .map((url) => parseGitHubUrl(url)?.ref)
         .find((r) => r !== undefined)
   // The configured URL, so the picker shows it selected; an unlisted one still loads.

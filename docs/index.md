@@ -1,19 +1,20 @@
 # Data Standard Validator Component
 
 `<data-standard-validator>` is a [Lit](https://lit.dev) web component for
-checking JSON and JSON-LD records against SHACL shapes in the browser. The
-person using it picks a standard, pastes a record or loads an example, and
-gets a plain-English list of what needs fixing. Each issue links to the line
-it is about.
+checking JSON and JSON-LD records, and CSV files, against SHACL shapes in
+the browser. The person using it picks a standard and a format, pastes a
+record or loads an example, and gets a plain-English list of what needs
+fixing. Each issue links to the line it is about; in a CSV file, to its row
+and cell, in an editable table or in the text.
 
 Validation is done by
 [@theodi/data-standard-validator](https://theodi.github.io/data-standard-validator/)
-in a Web Worker. Records never leave the browser; only the shape and context
-files are downloaded.
+in a Web Worker. Records never leave the browser; only the shape, context and
+CSVW files are downloaded.
 
 The element knows nothing about any particular standard. You give it a
-config that lists the standards: their shapes, their context and some
-example records.
+config that lists the standards: their shapes, their context, the CSVW
+mapping for CSV, and some example records.
 
 ```html
 <data-standard-validator></data-standard-validator>

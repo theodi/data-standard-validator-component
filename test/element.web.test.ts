@@ -122,6 +122,65 @@ describe('<data-standard-validator>', () => {
     expect(await page.textContent('.results')).toContain('Validate a record')
   })
 
+  test('links the shape and context of a JSON standard', async () => {
+    const links = await page.$$eval('.standard-files a', (nodes) => nodes.map((n) => n.getAttribute('data-kind')))
+    expect(links).toEqual(['Shape', 'Context'])
+  })
+
+  test('offers CSV for a standard with CSVW, with its own examples and files', async () => {
+    await page.check('[name="format"][value="csv"]')
+    const examples = await page.$$eval('[name="example"] option', (nodes) => nodes.map((n) => (n as HTMLOptionElement).value))
+    expect(examples.slice(1).every((url) => url.endsWith('.csv'))).toBe(true)
+    const links = await page.$$eval('.standard-files a', (nodes) => nodes.map((n) => n.getAttribute('data-kind')))
+    expect(links).toEqual(['Shape', 'CSVW mapping'])
+    expect(await page.textContent('.privacy')).toContain('CSVW mapping')
+  })
+
+  test('flags the cells, rows and columns of an invalid CSV in the table', async () => {
+    await page.selectOption('[name="example"]', { label: 'invalid' })
+    await page.waitForSelector('.verdict.fail', { timeout: 120_000 })
+    expect(await page.textContent('.verdict')).toContain('1 of 3 rows fails')
+    // Row 2's name is empty, its postcode is wrong; the notes column is not in the mapping.
+    expect(await page.textContent('td.flagged.violation[data-record="2"][data-column="0"]')).toBe('empty')
+    expect(await page.textContent('td.flagged.violation[data-record="2"][data-column="3"]')).toBe('nope')
+    expect(await page.textContent('tr.flagged.violation .rownum')).toBe('2')
+    expect(await page.isVisible('th.flagged.warning[data-column="4"]')).toBe(true)
+    expect(await page.textContent('.group h3')).toContain('Row 2')
+  })
+
+  test('outlines the cell when an issue is clicked', async () => {
+    await page.click('.issue.violation >> text=age')
+    expect(await page.getAttribute('td.focus', 'data-column')).toBe('1')
+    expect(await page.isVisible('.issue.selected')).toBe(true)
+  })
+
+  test('edits a cell in place, writing it into the text', async () => {
+    await page.dblclick('td[data-record="2"][data-column="3"]')
+    await page.fill('.cell-input', 'GH1')
+    await page.press('.cell-input', 'Enter')
+    expect(await page.isVisible('td.flagged[data-record="2"][data-column="3"]')).toBe(false)
+    await page.click('button.view-text')
+    expect(await page.inputValue('[name="data"]')).toContain(',Retired,GH1,')
+  })
+
+  test('marks the lines and cells in the text view after validating again', async () => {
+    await page.click('button.validate')
+    await page.waitForSelector('.verdict.fail', { timeout: 120_000 })
+    const metas = await page.$$eval('.issue-meta', (nodes) => nodes.map((n) => n.textContent))
+    expect(metas.some((m) => m?.includes('postcode'))).toBe(false)
+    expect(await page.textContent('.gutter .flagged')).toBe('1')
+    expect(await page.$$eval('.highlight mark.cell-violation', (nodes) => nodes.length)).toBeGreaterThan(0)
+  })
+
+  test('keeps each format\'s text when switching between them', async () => {
+    await page.check('[name="format"][value="json"]')
+    expect(await page.inputValue('[name="data"]')).toBe('')
+    await page.check('[name="format"][value="csv"]')
+    expect(await page.inputValue('[name="data"]')).toContain('GH1')
+    await page.click('button.clear')
+    await page.check('[name="format"][value="json"]')
+  })
+
   test('opens on the standard and example a link names', async () => {
     const url = (file: string): string => `${origin}/fixtures/${file}`
     const query = new URLSearchParams({

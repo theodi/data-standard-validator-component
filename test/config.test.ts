@@ -6,7 +6,7 @@
 
 import { describe, expect, test } from 'vitest'
 import {
-  defaultRef, exampleList, fetchUrl, formatOf, formatsOf, matchLink, pageUrl, parseGitHubUrl, parseLinkParams,
+  defaultRef, exampleFetchUrl, exampleList, fetchUrl, inShapesRepo, formatOf, formatsOf, matchLink, pageUrl, parseGitHubUrl, parseLinkParams,
   resolveStandard, shapesRepo, standardFiles, type ValidatorConfig,
 } from '../src/config.js'
 
@@ -48,7 +48,23 @@ describe('a config', () => {
   test('is versioned at the ref of its first GitHub shape', () => {
     expect(defaultRef(config)).toBe('main')
     expect(defaultRef({ ...config, ref: 'v2' })).toBe('v2')
-    expect(shapesRepo(config)).toEqual({ name: 'o/r', url: 'https://github.com/o/r' })
+    expect(shapesRepo(config)).toEqual({ owner: 'o', repo: 'r', name: 'o/r', url: 'https://github.com/o/r' })
+  })
+
+  test('starts at the same ref whether it lists branches or tags', () => {
+    expect(defaultRef({ ...config, versions: 'tags' })).toBe('main')
+    expect(defaultRef({ ...config, versions: 'tags', ref: 'v2' })).toBe('v2')
+  })
+
+  test('examples beside the shapes are read at the ref; others as written', () => {
+    const beside = 'https://github.com/o/r/blob/main/examples/x.jsonld'
+    const elsewhere = 'https://github.com/o/examples/blob/main/x.jsonld'
+    expect(inShapesRepo(config, beside)).toBe(true)
+    expect(inShapesRepo(config, elsewhere)).toBe(false)
+    expect(exampleFetchUrl(config, beside, 'v1.0.0')).toBe('https://raw.githubusercontent.com/o/r/v1.0.0/examples/x.jsonld')
+    expect(exampleFetchUrl(config, beside)).toBe('https://raw.githubusercontent.com/o/r/main/examples/x.jsonld')
+    expect(exampleFetchUrl(config, elsewhere, 'v1.0.0')).toBe('https://raw.githubusercontent.com/o/examples/main/x.jsonld')
+    expect(exampleFetchUrl(config, 'https://example.org/x.json', 'v1.0.0')).toBe('https://example.org/x.json')
   })
 
   test('is not versioned when no shape comes from GitHub', () => {
@@ -179,6 +195,20 @@ describe('a link to the page', () => {
     const other = 'https://example.org/other.jsonld'
     expect(matchLink(config, { shapes: [shape('a')], example: other }))
       .toEqual({ standardIndex: 0, ref: 'main', example: other })
+  })
+
+  test('an example beside the shapes sets the version; one elsewhere does not', () => {
+    const beside = (ref: string): string => `https://github.com/o/r/blob/${ref}/examples/b-valid.jsonld`
+    const withBeside: ValidatorConfig = {
+      standards: config.standards.map((s) => ({ ...s, examples: [beside('main')] })),
+    }
+    expect(matchLink(withBeside, { shapes: [], example: beside('v1.0.0') }))
+      .toEqual({ standardIndex: 0, ref: 'v1.0.0', example: beside('main') })
+    // The shapes' own ref wins over the example's.
+    expect(matchLink(withBeside, { shapes: ['https://github.com/o/r/blob/v2/b/shape.ttl'], example: beside('v1.0.0') }))
+      .toEqual({ standardIndex: 1, ref: 'v2', example: beside('main') })
+    expect(matchLink(config, { shapes: [], example: 'https://github.com/o/examples/blob/v1.0.0/b-valid.jsonld' }))
+      .toEqual({ standardIndex: 1, example: example('b-valid') })
   })
 
   test('asks for no ref when nothing is versioned', () => {

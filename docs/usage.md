@@ -83,6 +83,7 @@ screens the panes stack.
 | --- | --- |
 | `standards` | The standards to offer (required). |
 | `ref` | Git ref to read GitHub-hosted shapes and contexts at. Defaults to the ref in the first GitHub shape URL. |
+| `versions` | What the **Version** box lists from the shapes repository: `'branches'` (default) or `'tags'`. The starting `ref` is always listed first, even when it is not a tag. |
 | `patterns` | Plain-English names for the `sh:pattern` regexes the shapes use: `{ pattern, description, example? }`. Used only when the shape has no `sh:message` of its own. |
 | `placeholder` | Text shown in the empty editor. |
 | `urlParams` | Read `shape`, `context`, `csvw` and `example` from the page's query string (see below). On by default; `false` turns it off. |
@@ -100,8 +101,32 @@ screens the panes stack.
 
 GitHub page links (`github.com/<owner>/<repo>/blob/<ref>/...`) are fetched
 from `raw.githubusercontent.com`, which is the only GitHub host that allows
-cross-origin requests. When any shape comes from GitHub, an **Advanced** box
-lets the person change the ref. Other URLs are fetched exactly as written.
+cross-origin requests. Other URLs are fetched exactly as written.
+
+When any shape comes from GitHub, the toolbar shows a **Version** disclosure.
+Clicking it opens a list of the repository's branches or tags (see `versions`),
+in GitHub's order (tags newest first), and picking one closes it. The starting
+ref is marked *default*; with tags, the newest that isn't a pre-release
+(`-draft`, `-rc.1`, `-beta`...) is marked *latest* and pre-releases *draft*.
+While a ref other than the default is in use, the summary names it
+(`Version · v1.1.0`) so it isn't forgotten. The first GitHub shape's
+repository is the one listed.
+
+The chosen version applies to every GitHub-hosted shape, context and CSVW
+mapping, and to examples in the **same repository as the shapes**. Examples
+elsewhere (another repository, another host) are fetched as written, since the
+version names a revision of the shapes' repository only. Picking another
+version reloads an example from the shapes' repository at that version, unless
+it has been edited. If the example isn't in that version, the results pane says
+so. The list comes from GitHub's
+API as soon as the element has a config. GitHub allows 60 unauthenticated
+requests an hour per IP address, so the element fetches each list at most once
+per page and keeps it in `localStorage`. On later loads the stored list shows
+at once and is refreshed in the background (unless it is under a minute old),
+so a new branch or tag appears on the next load. If that refresh fails, the
+stored list stays. That list is the only thing the element stores. If no list
+can be had at all (rate limit, offline, private repository), the box falls back
+to a text field where any branch, tag or commit can be typed.
 
 Under the description, **Standard files** links to the standard's shapes, and
 to its context (JSON) or its CSVW mapping (CSV). GitHub files link to their
@@ -161,7 +186,8 @@ https://your.site/?shape=<shape URL>&context=<context URL>&example=<example URL>
   still loaded. A `.csv` example opens in CSV.
 - GitHub page and raw links count as the same file. A shape or context link at
   another ref (`blob/v1.0.0/...`) matches the standard and sets the shapes
-  version to that ref.
+  version to that ref. So does an example link in the shapes' repository, when
+  no shape or context link gives a ref.
 - Relative URLs resolve against the page. Encode a URL that contains `&` or `#`
   (`encodeURIComponent`).
 

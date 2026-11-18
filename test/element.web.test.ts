@@ -76,7 +76,7 @@ describe('<data-standard-validator>', () => {
   })
 
   test('hides the version box when no shape comes from GitHub', async () => {
-    expect(await page.isHidden('details.advanced')).toBe(true)
+    expect(await page.isHidden('details.version')).toBe(true)
   })
 
   test('loads an example and validates it', async () => {
@@ -197,6 +197,134 @@ describe('<data-standard-validator>', () => {
     } finally {
       await linked.close()
     }
+  })
+
+  describe('the Version box, for shapes on GitHub', () => {
+    const shape = 'https://github.com/o/r/blob/main/person-shape.ttl'
+
+    // GitHub's API is stubbed: the test must not depend on the network or its rate limit.
+    async function open (answer: { status: number, body: unknown }, stored?: string[]): Promise<{ page: Page, asked: string[] }> {
+      const versioned = await browser.newPage()
+      const asked: string[] = []
+      await versioned.route('https://api.github.com/**', async (route) => {
+        asked.push(route.request().url())
+        await route.fulfill({ status: answer.status, contentType: 'application/json', body: JSON.stringify(answer.body) })
+      })
+      await versioned.goto(`${origin}/`)
+      // An hour-old list, as a page loaded earlier would have left it.
+      await versioned.evaluate((refs) => {
+        localStorage.clear()
+        if (refs) localStorage.setItem('dsv-refs:v1:o/r:branches', JSON.stringify({ at: Date.now() - 3_600_000, refs }))
+      }, stored)
+      await versioned.evaluate((url) => {
+        const el = document.querySelector('data-standard-validator') as HTMLElement & { config: unknown }
+        el.config = { standards: [{ name: 'On GitHub', shapes: url }] }
+      }, shape)
+      await versioned.click('details.version summary')
+      return { page: versioned, asked }
+    }
+
+    const isOpen = (p: Page): Promise<boolean> => p.$eval('details.version', (el) => (el as HTMLDetailsElement).open)
+
+    test('lists the branches, and reads the shapes at the one picked', async () => {
+      const { page: versioned, asked } = await open({ status: 200, body: [{ name: 'dev' }, { name: 'main' }] })
+      try {
+        await versioned.waitForSelector('.ref-list[aria-busy="false"]')
+        expect(asked).toEqual(['https://api.github.com/repos/o/r/branches?per_page=100'])
+        expect((await versioned.textContent('details.version summary'))?.trim()).toBe('Version')
+        expect(await versioned.textContent('.ref-list label.on .ref-note')).toBe('default')
+        const refs = await versioned.$$eval('[name="ref"]', (nodes) => nodes.map((n) => (n as HTMLInputElement).value))
+        expect(refs).toEqual(['dev', 'main'])
+        expect(await versioned.$eval('[name="ref"]:checked', (el) => (el as HTMLInputElement).value)).toBe('main')
+
+        await versioned.click('.ref-list label:has([value="dev"])')
+        expect(await isOpen(versioned)).toBe(false)
+        expect(await versioned.textContent('.version-current')).toBe('dev')
+        expect(await versioned.getAttribute('.standard-files a', 'href'))
+          .toBe('https://github.com/o/r/blob/dev/person-shape.ttl')
+
+        await versioned.click('details.version summary')
+        expect(await isOpen(versioned)).toBe(true)
+        await versioned.keyboard.press('Escape')
+        expect(await isOpen(versioned)).toBe(false)
+      } finally {
+        await versioned.close()
+      }
+    })
+
+    test('shows a stored list at once, then the branches GitHub has now', async () => {
+      const body = [{ name: 'automation/sync' }, { name: 'main' }]
+      const { page: versioned, asked } = await open({ status: 200, body }, ['main'])
+      try {
+        await versioned.waitForSelector('[name="ref"][value="automation/sync"]')
+        expect(asked).toHaveLength(1)
+        const refs = await versioned.$$eval('[name="ref"]', (nodes) => nodes.map((n) => (n as HTMLInputElement).value))
+        expect(refs).toEqual(['automation/sync', 'main'])
+      } finally {
+        await versioned.close()
+      }
+    })
+
+    test('reads an example beside the shapes at the version picked', async () => {
+      const versioned = await browser.newPage()
+      const examples: Record<string, string> = {
+        'https://raw.githubusercontent.com/o/r/main/examples/x.jsonld': '{ "at": "main" }',
+        'https://raw.githubusercontent.com/o/r/v2/examples/x.jsonld': '{ "at": "v2" }',
+      }
+      await versioned.route('https://api.github.com/**', (route) => route.fulfill({
+        contentType: 'application/json', body: JSON.stringify([{ name: 'v2' }, { name: 'v1' }]),
+      }))
+      await versioned.route('https://raw.githubusercontent.com/**', (route) => {
+        const body = examples[route.request().url()]
+        return body !== undefined ? route.fulfill({ body }) : route.fulfill({ status: 404, body: 'Not found' })
+      })
+      try {
+        await versioned.goto(`${origin}/`)
+        await versioned.evaluate((url) => {
+          localStorage.clear()
+          const el = document.querySelector('data-standard-validator') as HTMLElement & { config: unknown }
+          el.config = { versions: 'tags', standards: [{ name: 'On GitHub', shapes: url, examples: [url.replace('person-shape.ttl', 'examples/x.jsonld')] }] }
+        }, shape)
+        const pick = async (ref: string): Promise<void> => {
+          await versioned.click('details.version summary')
+          await versioned.click(`.ref-list label:has([value="${ref}"])`)
+        }
+        await versioned.selectOption('[name="example"]', { label: 'x' })
+        await versioned.waitForFunction(() => document.querySelector('data-standard-validator')!.shadowRoot!
+          .querySelector<HTMLTextAreaElement>('[name="data"]')!.value.includes('main'))
+
+        await pick('v2')
+        await versioned.waitForFunction(() => document.querySelector('data-standard-validator')!.shadowRoot!
+          .querySelector<HTMLTextAreaElement>('[name="data"]')!.value.includes('v2'))
+
+        // Not in v1: say so, and leave the editor alone.
+        await pick('v1')
+        await versioned.waitForSelector('.results >> text=not in version v1 of o/r')
+        expect(await versioned.inputValue('[name="data"]')).toContain('v2')
+
+        // An edited example is the person's now; another version leaves it be.
+        await versioned.fill('[name="data"]', '{ "mine": true }')
+        await pick('main')
+        await versioned.waitForTimeout(300)
+        expect(await versioned.inputValue('[name="data"]')).toBe('{ "mine": true }')
+      } finally {
+        await versioned.close()
+      }
+    })
+
+    test('falls back to typing a ref when GitHub will not list them', async () => {
+      const { page: versioned } = await open({ status: 403, body: { message: 'rate limit' } })
+      try {
+        await versioned.waitForSelector('input[name="ref"]')
+        expect(await versioned.inputValue('[name="ref"]')).toBe('main')
+        expect(await versioned.textContent('.ref-help')).toContain("Couldn't list the versions")
+        await versioned.fill('[name="ref"]', 'v1.0.0')
+        expect(await versioned.getAttribute('.standard-files a', 'href'))
+          .toBe('https://github.com/o/r/blob/v1.0.0/person-shape.ttl')
+      } finally {
+        await versioned.close()
+      }
+    })
   })
 
   test('the browser logged no errors throughout', () => {

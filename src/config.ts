@@ -16,6 +16,11 @@ export interface ValidatorConfig {
    */
   ref?: string
   /**
+   * What the Version box offers from the shapes repository: its branches (the
+   * default) or its tags. The starting ref is listed either way.
+   */
+  versions?: VersionKind
+  /**
    * Plain-English names for the `sh:pattern` regexes the shapes use, for
    * shapes that carry no `sh:message` of their own.
    */
@@ -52,6 +57,9 @@ export interface StandardConfig {
    */
   examples?: (string | { name: string, url: string })[]
 }
+
+/** Which of a GitHub repository's refs the Version box lists. */
+export type VersionKind = 'branches' | 'tags'
 
 /** What the person is validating. An example's format comes from its extension. */
 export type DataFormat = 'json' | 'csv'
@@ -165,12 +173,31 @@ export function defaultRef (config: ValidatorConfig): string | undefined {
   return config.ref ?? firstGitHubShape(config)?.ref
 }
 
-/** Where the shapes live, for the version box's help text. */
-export function shapesRepo (config: ValidatorConfig): { name: string, url: string } | undefined {
+/** A GitHub repository, as the Version box names, links and lists it. */
+export interface GitHubRepo { owner: string, repo: string, name: string, url: string }
+
+/** Where the shapes live: the repository the Version box lists refs from. */
+export function shapesRepo (config: ValidatorConfig): GitHubRepo | undefined {
   const file = firstGitHubShape(config)
   if (!file) return undefined
   const name = `${file.owner}/${file.repo}`
-  return { name, url: `https://github.com/${name}` }
+  return { owner: file.owner, repo: file.repo, name, url: `https://github.com/${name}` }
+}
+
+/** Whether a URL is a GitHub file in the repository the shapes are versioned in. */
+export function inShapesRepo (config: ValidatorConfig, url: string): boolean {
+  const repo = firstGitHubShape(config)
+  const file = parseGitHubUrl(url)
+  return repo !== undefined && file !== undefined && file.owner === repo.owner && file.repo === repo.repo
+}
+
+/**
+ * Where to fetch an example from. One in the shapes' repository is read at
+ * `ref`, so it is the example that goes with those shapes. One anywhere else is
+ * fetched as written: the ref names a revision of the shapes' repository only.
+ */
+export function exampleFetchUrl (config: ValidatorConfig, url: string, ref?: string): string {
+  return fetchUrl(url, ref !== undefined && inShapesRepo(config, url) ? ref : undefined)
 }
 
 /** The standard's examples, named; only those in `format` when it is given. */
@@ -229,10 +256,12 @@ export function matchLink (config: ValidatorConfig, link: LinkParams): LinkMatch
   })
   if (standardIndex === -1) return undefined
   const standard = config.standards[standardIndex]!
-  // The ref box applies to the standard's own files only; an example's ref says nothing about it.
+  // The standard's own files say which version to use. An example says so too,
+  // but only when it lives with the shapes: elsewhere its ref is another repository's.
   const ref = defaultRef(config) === undefined
     ? undefined
-    : [...shapes, ...[context, csvMetadata].filter((url) => url !== undefined)]
+    : [...shapes, ...[context, csvMetadata].filter((url) => url !== undefined),
+        ...(example !== undefined && inShapesRepo(config, example) ? [example] : [])]
         .map((url) => parseGitHubUrl(url)?.ref)
         .find((r) => r !== undefined)
   // The configured URL, so the picker shows it selected; an unlisted one still loads.

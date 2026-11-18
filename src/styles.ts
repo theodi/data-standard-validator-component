@@ -143,7 +143,7 @@ a:hover, a:focus { color: var(--link-hover); }
   position: relative;
 }
 .field { flex: 0 1 18rem; min-width: 12rem; }
-.field label, .advanced-body label {
+.field label, .version-body label {
   display: block;
   font-weight: 700;
   font-size: 0.8rem;
@@ -250,21 +250,70 @@ summary:focus-visible, a:focus-visible, .issue:focus-visible {
   outline-offset: 2px;
 }
 
-.advanced { align-self: center; margin-left: auto; }
-.advanced summary { cursor: pointer; font-size: 0.85rem; color: var(--text-dim); }
-/* Floats over the workspace, so opening it never pushes the panes around. */
-.advanced-body {
+/* A quiet disclosure: it draws the eye only when a version other than the default is in use. */
+.version { position: relative; align-self: center; margin-left: auto; }
+.version summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+.version summary::marker, .version summary::-webkit-details-marker { color: var(--text); font-size: 0.85em; }
+.version summary:hover, .version[open] summary { color: var(--text); }
+.version summary:hover .version-label { text-decoration: underline; text-underline-offset: 3px; }
+.version-dot { margin: 0 6px; color: var(--warning); font-weight: 700; }
+.version-current { font-family: var(--mono); font-size: 0.85rem; font-weight: 700; color: var(--warning); }
+/* Floats under the summary, so opening it never pushes the panes around. */
+.version-body {
   position: absolute;
-  right: 24px;
-  top: calc(100% - 4px);
+  right: 0;
+  top: calc(100% + 8px);
   z-index: 10;
   width: min(30rem, calc(100vw - 32px));
   padding: 14px 16px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: calc(var(--radius) + 2px);
   box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.3);
 }
+.version-menu {
+  width: auto;
+  min-width: 15rem;
+  max-width: calc(100vw - 32px);
+  padding: 5px;
+}
+.ref-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+.ref-list label {
+  /* Rows keep their height and the list scrolls, rather than squeezing them to fit. */
+  flex: none;
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--text);
+  cursor: pointer;
+}
+.ref-list label:hover, .ref-list label.on { background: var(--surface-2); }
+.ref-list input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+/* Inside, since the list clips anything drawn outside a row. */
+.ref-list label:has(input:focus-visible) { outline: 2px solid var(--link); outline-offset: -2px; }
+.ref-check { width: 16px; height: 16px; fill: none; stroke: var(--text); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; visibility: hidden; }
+.ref-list label.on .ref-check { visibility: visible; }
+.ref-name { font-family: var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ref-list label.on .ref-name { font-weight: 700; }
+.ref-note { font-size: 0.8rem; color: var(--text-dim); }
+.ref-loading { margin: 4px 10px 6px 34px; font-size: 0.8rem; color: var(--text-dim); }
 
 /* ---- Workspace: editor | results --------------------------------------- */
 
@@ -634,6 +683,5 @@ mark.cell-warning.empty::after { background: var(--warning-bg); border-color: va
   .field { flex: 1 1 100%; }
   .actions { flex: 1; }
   .actions button { flex: 1; }
-  .advanced-body { right: 16px; }
 }
 `

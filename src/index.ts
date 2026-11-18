@@ -9,7 +9,7 @@
 import { DataStandardValidator } from './validator-element.js'
 
 export { DataStandardValidator }
-export type { ValidatorConfig, StandardConfig } from './config.js'
+export type { ValidatorConfig, StandardConfig, VersionKind } from './config.js'
 
 if (!customElements.get('data-standard-validator')) {
   customElements.define('data-standard-validator', DataStandardValidator)

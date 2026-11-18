@@ -16,7 +16,7 @@ import { live } from 'lit/directives/live.js'
 import { unsafeHTML } from 'lit/directives/unsafe-html.js'
 import type { Issue, RunReport } from '@theodi/data-standard-validator'
 import {
-  defaultRef, exampleList, fetchUrl, formatOf, formatsOf, matchLink, parseLinkParams, resolveStandard,
+  defaultRef, exampleFetchUrl, exampleList, fetchUrl, inShapesRepo, formatOf, formatsOf, matchLink, parseLinkParams, resolveStandard,
   shapesRepo, standardFiles, type DataFormat, type StandardConfig, type ValidatorConfig,
 } from './config.js'
 import {
@@ -24,6 +24,7 @@ import {
   type CsvTable, type CsvwSummary,
 } from './csv.js'
 import { highlightCsv, highlightJson, type TextMark } from './highlight.js'
+import { isDraftTag, latestTag, listRefs, refOptions } from './refs.js'
 import { banner, flaggedCells, flaggedLines, renderReport, textMarks, type RunLabel } from './report.js'
 import { styles } from './styles.js'
 import type { ValidateRequest, WorkerResponse } from './worker.js'
@@ -100,6 +101,7 @@ export class DataStandardValidator extends LitElement {
     standardIndex: { state: true },
     exampleUrl: { state: true },
     ref: { state: true },
+    refList: { state: true },
     format: { state: true },
     view: { state: true },
     text: { state: true },
@@ -123,6 +125,8 @@ export class DataStandardValidator extends LitElement {
   declare private standardIndex: number
   declare private exampleUrl: string
   declare private ref: string
+  /** The refs the Version box offers; `failed` falls back to typing one. */
+  declare private refList: string[] | 'loading' | 'failed'
   declare private format: DataFormat
   declare private view: View
   declare private text: string
@@ -150,6 +154,8 @@ export class DataStandardValidator extends LitElement {
   private inFlight: RunLabel = { standard: '' }
   // Only the latest example pick may fill the editor, however the fetches finish.
   private exampleToken = 0
+  // The example as loaded, so a version change reloads it only while nobody has edited it.
+  private exampleText: string | undefined
   // Only the latest standard's CSVW may describe the table.
   private csvwToken = 0
   // The page's link picks the starting standard once; a later config does not re-apply it.
@@ -167,6 +173,7 @@ export class DataStandardValidator extends LitElement {
     this.standardIndex = 0
     this.exampleUrl = ''
     this.ref = ''
+    this.refList = 'loading'
     this.format = 'json'
     this.view = 'table'
     this.text = ''
@@ -188,6 +195,7 @@ export class DataStandardValidator extends LitElement {
 
   override disconnectedCallback (): void {
     super.disconnectedCallback()
+    document.removeEventListener('pointerdown', this.onOutsideVersion)
     this.worker?.terminate()
     this.worker = undefined
   }
@@ -197,6 +205,7 @@ export class DataStandardValidator extends LitElement {
       this.standardIndex = 0
       this.exampleUrl = ''
       this.ref = this.config !== undefined ? defaultRef(this.config) ?? '' : ''
+      this.loadRefs()
       if (!this.linked) this.applyLink()
       if (this.standard !== undefined && !formatsOf(this.standard).includes(this.format)) this.switchFormat('json')
       this.loadCsvwSummary()
@@ -222,6 +231,23 @@ export class DataStandardValidator extends LitElement {
     } else if (reveal === 'issue') {
       this.find<HTMLElement>('.issue.selected')?.scrollIntoView({ block: 'nearest' })
     }
+  }
+
+  /*
+   * Asked for as soon as there is a config, not when the box is opened, so the
+   * list is usually there by the time anyone looks.
+   */
+  private loadRefs (): void {
+    const config = this.config
+    const repo = config !== undefined ? shapesRepo(config) : undefined
+    if (config === undefined || repo === undefined) { this.refList = 'failed'; return }
+    this.refList = 'loading'
+    const show = (refs: string[]): void => { if (this.config === config) this.refList = refs }
+    // A stored list shows at once; `onUpdate` brings in what GitHub says now.
+    listRefs(repo, config.versions ?? 'branches', { onUpdate: show }).then(
+      show,
+      () => { if (this.config === config) this.refList = 'failed' },
+    )
   }
 
   /** Open on the standard and example the page's query string names, if any. */
@@ -630,21 +656,86 @@ export class DataStandardValidator extends LitElement {
     this.exampleUrl = url
     if (url === '') return
     const token = ++this.exampleToken
+    const config = this.config
+    const ref = this.effectiveRef
+    // An example beside the shapes is read at the same version as them.
+    const versioned = config !== undefined && ref !== undefined && inShapesRepo(config, url)
     this.results = { kind: 'info', text: 'Loading example…' }
     void (async () => {
       try {
-        const response = await fetch(fetchUrl(url))
+        const response = await fetch(config !== undefined ? exampleFetchUrl(config, url, ref) : fetchUrl(url))
+        if (response.status === 404 && versioned) {
+          throw new Error(`it is not in version ${ref} of ${shapesRepo(config)?.name ?? 'the shapes repository'}`)
+        }
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         const text = await response.text()
         if (token !== this.exampleToken) return
         this.setText(text)
+        this.exampleText = this.text
         this.results = undefined
         this.validate()
       } catch (error) {
         if (token !== this.exampleToken) return
-        this.results = { kind: 'error', text: `Could not load the example: ${(error as Error).message}` }
+        // exampleText is kept: the editor still holds the example, unedited, so
+        // picking a version that has it brings it back.
+        this.results = { kind: 'error', text: `Could not load the example: ${(error as Error).message}.` }
       }
     })()
+  }
+
+  private onRefPick (event: Event): void {
+    this.ref = (event.target as HTMLInputElement).value
+    if (event.type === 'change') this.reloadExample()
+  }
+
+  /*
+   * An example beside the shapes belongs to their version, so picking another
+   * version brings in that version's copy - unless the person has edited it,
+   * since their edits matter more than keeping the example in step.
+   */
+  private reloadExample (): void {
+    const config = this.config
+    const url = this.exampleUrl
+    if (config === undefined || url === '' || !inShapesRepo(config, url)) return
+    if (this.exampleText === undefined || this.text !== this.exampleText) return
+    this.loadExample(url)
+  }
+
+  // A click or Space picks and is done. Arrow keys only move through the list,
+  // and fire no click, so the list stays open until Enter or Escape.
+  private onRefClick (event: Event): void {
+    if ((event.target as Element).closest('label') !== null) this.closeVersion()
+  }
+
+  private onVersionKey (event: KeyboardEvent): void {
+    const inList = (event.target as Element).closest('.ref-list') !== null
+    // Enter on a radio would submit the form and validate; in the text field it still does.
+    if (event.key === 'Escape' || (event.key === 'Enter' && inList)) {
+      event.preventDefault()
+      this.closeVersion()
+    }
+  }
+
+  private onVersionToggle (event: Event): void {
+    const details = event.target as HTMLDetailsElement
+    if (!details.open) { document.removeEventListener('pointerdown', this.onOutsideVersion); return }
+    // Like any menu, a press anywhere else closes it.
+    document.addEventListener('pointerdown', this.onOutsideVersion)
+    const target = details.querySelector<HTMLInputElement>('.ref-list input:checked, .ref-input')
+    target?.focus({ preventScroll: true })
+    target?.closest('label')?.scrollIntoView({ block: 'nearest' })
+  }
+
+  private readonly onOutsideVersion = (event: Event): void => {
+    const details = this.find<HTMLDetailsElement>('details.version')
+    if (details?.open === true && !event.composedPath().includes(details)) details.open = false
+  }
+
+  private closeVersion (): void {
+    const details = this.find<HTMLDetailsElement>('details.version')
+    if (details?.open !== true) return
+    details.open = false
+    details.querySelector('summary')?.focus()
   }
 
   private onClear (): void {
@@ -680,11 +771,60 @@ export class DataStandardValidator extends LitElement {
   // Rendering
   // -------------------------------------------------------------------------
 
-  private renderRefHelp (): TemplateResult {
-    const repo = this.config !== undefined ? shapesRepo(this.config) : undefined
-    return html`Which revision of ${repo
-      ? html`<a href=${repo.url} rel="noreferrer">${repo.name}</a>`
-      : 'the shapes repository'} the shapes are read from. A tag pins results; a branch tracks the latest.`
+  /*
+   * Once the refs are listed, the box is just that list: one pick, and it
+   * closes. Until then, and if GitHub won't list them, it is a text field, so
+   * any branch, tag or commit can still be typed.
+   */
+  private renderVersion (): TemplateResult {
+    const config = this.config
+    const initial = config !== undefined ? defaultRef(config) : undefined
+    if (config === undefined || initial === undefined) return html`<details class="version" hidden></details>`
+    const current = this.ref.trim() || initial
+    const repo = shapesRepo(config)
+    const where = repo ? html`<a href=${repo.url} rel="noreferrer">${repo.name}</a>` : 'the shapes repository'
+    const failed = this.refList === 'failed'
+    // One <details> either way, so it stays open if the list fails while someone has it open.
+    return html`
+      <details class="version" @toggle=${this.onVersionToggle} @keydown=${this.onVersionKey}>
+        <summary><span class="version-label">Version</span>${current !== initial
+          // Named only when it isn't the default, so a version picked earlier isn't forgotten.
+          ? html`<span class="version-dot" aria-hidden="true">·</span><span class="version-current">${current}</span>`
+          : nothing}</summary>
+        <div class=${failed ? 'version-body' : 'version-body version-menu'}>
+          ${failed ? this.renderRefField(where) : this.renderRefList(config, current, initial)}
+        </div>
+      </details>`
+  }
+
+  private renderRefList (config: ValidatorConfig, current: string, initial: string): TemplateResult {
+    const tags = config.versions === 'tags'
+    const listed = Array.isArray(this.refList) ? this.refList : []
+    const latest = tags ? latestTag(listed) : undefined
+    const note = (ref: string): string =>
+      ref === latest ? 'latest' : tags && isDraftTag(ref) ? 'draft' : ref === initial ? 'default' : ''
+    return html`
+      <div class="ref-list" role="radiogroup" aria-label="Shapes version"
+        aria-busy=${this.refList === 'loading' ? 'true' : 'false'}
+        @change=${this.onRefPick} @click=${this.onRefClick}>
+        ${refOptions(listed, current, initial).map((ref) => html`
+          <label class=${ref === current ? 'on' : ''}>
+            <input type="radio" name="ref" value=${ref} .checked=${live(ref === current)} />
+            <svg class="ref-check" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5" /></svg>
+            <span class="ref-name">${ref}</span>
+            <span class="ref-note">${note(ref)}</span>
+          </label>`)}
+      </div>
+      ${this.refList === 'loading' ? html`<p class="ref-loading">Loading versions…</p>` : nothing}`
+  }
+
+  private renderRefField (where: unknown): TemplateResult {
+    return html`
+      <label for="ref">Shapes version</label>
+      <input id="ref" name="ref" class="ref-input" spellcheck="false"
+        .value=${live(this.ref)} @input=${this.onRefPick} @change=${this.onRefPick} />
+      <p class="help ref-help">Couldn't list the versions of ${where}; type a branch, tag or commit.
+        A tag pins results; a branch tracks the latest.</p>`
   }
 
   private renderGutter (): TemplateResult[] {
@@ -881,7 +1021,6 @@ export class DataStandardValidator extends LitElement {
   protected override render (): TemplateResult {
     const config = this.config
     const standard = this.standard
-    const versioned = config !== undefined && defaultRef(config) !== undefined
     return html`
       <form class="toolbar" autocomplete="off" @submit=${this.onSubmit}>
         <div class="field">
@@ -904,15 +1043,7 @@ export class DataStandardValidator extends LitElement {
           <button type="submit" class="primary validate" ?disabled=${this.busy}>${this.busy ? 'Validating…' : 'Validate'}</button>
           <button type="button" class="ghost clear" @click=${this.onClear}>Clear</button>
         </div>
-        <details class="advanced" ?hidden=${!versioned}>
-          <summary>Advanced</summary>
-          <div class="advanced-body">
-            <label for="ref">Shapes version (git ref)</label>
-            <input id="ref" name="ref" class="ref-input" spellcheck="false"
-              .value=${live(this.ref)} @input=${(e: Event) => { this.ref = (e.target as HTMLInputElement).value }} />
-            <p class="help ref-help">${versioned ? this.renderRefHelp() : nothing}</p>
-          </div>
-        </details>
+        ${this.renderVersion()}
         <div class="toolbar-info">
           ${standard?.description !== undefined
             ? html`<p class="help toolbar-help standard-help">${standard.description}</p>`

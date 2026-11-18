@@ -3,8 +3,14 @@
 `<data-standard-validator>`, a Lit web component that validates JSON and
 JSON-LD records, and CSV files through CSVW, against SHACL shapes in the browser. The engine is
 [@theodi/data-standard-validator](https://github.com/theodi/data-standard-validator)
-(locally `../data-standard-validator`). Its first host is
-[SocialCareData/validator](https://github.com/SocialCareData/validator) (locally `../validator`).
+(locally `../data-standard-validator`). Its hosts are
+[theodi/data-standard-validator-demo](https://github.com/theodi/data-standard-validator-demo)
+(npm, config in `src/config.js`; locally `../data-standard-validator-demo`) and the
+[SocialCareData/standard](https://github.com/SocialCareData/standard) site
+(standalone bundle from jsDelivr in `src/_pages/validator.md`, config in
+`src/_data/validator.yml`; locally `../standard`). That site's shapes live in
+SocialCareData/ontology but its examples in SocialCareData/standard, so the
+Version box must not rewrite examples outside the shapes' repository.
 
 ```bash
 npm test             # unit: config, csv, highlight, engine - offline
@@ -22,7 +28,10 @@ engine.
 
 **Records are never stored in the browser.** They may contain personal data,
 so nothing typed or loaded into the element goes to `localStorage`,
-`sessionStorage`, IndexedDB or cookies - not even behind an option.
+`sessionStorage`, IndexedDB or cookies - not even behind an option. The one
+thing kept in `localStorage` is the shapes repository's public list of branches
+or tags (`src/refs.ts`), because GitHub's API allows a browser only 60
+requests an hour.
 
 **Published to npm by a GitHub release** (`.github/workflows/cd.yml`) as
 [@theodi/data-standard-validator-component](https://www.npmjs.com/package/@theodi/data-standard-validator-component).
@@ -45,8 +54,8 @@ bundler bundles it. A Vite host must put this package in
 `optimizeDeps.exclude` (or the URL breaks in dev) and its engine in
 `optimizeDeps.include` (or the engine's CommonJS deps break in dev).
 
-**Shadow DOM.** Theming goes through `--dsv-*` custom properties only. The
-host's Playwright tests rely on the class names and `name=` attributes
+**Shadow DOM.** Theming goes through `--dsv-*` custom properties only. Hosts
+may script or test against the class names and `name=` attributes
 (`[name="standard|example|ref|data|format"]`, `button.validate`, `.verdict`,
 `.issue`, `.issue-meta`, `.pill`, `.banner`, `.standard-files a`,
 `button.view-table|view-text`, `.grid td[data-record][data-column]`,

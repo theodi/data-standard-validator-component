@@ -19,6 +19,7 @@ const config: ValidatorConfig = {
   }],
   patterns: [{ pattern: '^[A-Z]{2}[0-9]$', description: 'a short postcode', example: 'AB1' }],
   placeholder: 'Paste a JSON-LD person here, or load an example.',
+  readOnly: false,
 }
 
 document.querySelector('data-standard-validator')!.config = config

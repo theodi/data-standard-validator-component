@@ -435,6 +435,7 @@ summary:focus-visible, a:focus-visible, .issue:focus-visible {
   caret-color: var(--text);
 }
 .input::placeholder { color: var(--text-dim); }
+.input[readonly] { cursor: default; }
 .input::selection { color: transparent; background: var(--selection); }
 
 .tok-key { color: var(--syn-key); }
@@ -511,6 +512,7 @@ mark.cell-warning.empty::after { background: var(--warning-bg); border-color: va
   text-overflow: ellipsis;
   cursor: cell;
 }
+.grid[aria-readonly="true"] td { cursor: default; }
 .grid thead th {
   position: sticky;
   top: 0;

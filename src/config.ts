@@ -32,6 +32,12 @@ export interface ValidatorConfig {
    * string on load, to open on that standard and example. Defaults to true.
    */
   urlParams?: boolean
+  /**
+   * Only the configured examples can be validated: the editor and the CSV
+   * table show them but cannot be typed into, pasted or dropped on.
+   * Defaults to false.
+   */
+  readOnly?: boolean
 }
 
 export interface StandardConfig {

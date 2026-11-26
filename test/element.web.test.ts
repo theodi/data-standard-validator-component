@@ -327,6 +327,89 @@ describe('<data-standard-validator>', () => {
     })
   })
 
+  describe('read-only', () => {
+    /*
+     * A fresh element, so that it reads the link as the first one on the page
+     * would. The demo's own element has already read it, editable.
+     */
+    async function open (search = ''): Promise<Page> {
+      const readOnly = await browser.newPage()
+      await readOnly.goto(`${origin}/${search}`)
+      await readOnly.evaluate(() => {
+        type El = HTMLElement & { config: object }
+        const demo = document.querySelector('data-standard-validator') as El
+        const el = document.createElement('data-standard-validator') as El
+        el.config = { ...demo.config, readOnly: true }
+        demo.replaceWith(el)
+      })
+      return readOnly
+    }
+
+    test('runs the examples but offers no way to change them', async () => {
+      const readOnly = await open()
+      try {
+        expect(await readOnly.getAttribute('[name="data"]', 'readonly')).not.toBeNull()
+        expect(await readOnly.$('button.clear')).toBeNull()
+        expect(await readOnly.$('.privacy')).toBeNull()
+
+        await readOnly.selectOption('[name="example"]', { label: 'invalid' })
+        await readOnly.waitForSelector('.verdict.fail', { timeout: 120_000 })
+        await readOnly.click('.issue.violation >> text=postcode')
+        const line = await readOnly.$eval('[name="data"]', (el) => {
+          const input = el as HTMLTextAreaElement
+          return input.value.slice(0, input.selectionStart).split('\n').length
+        })
+        expect(line).toBe(6)
+
+        await readOnly.check('[name="format"][value="csv"]')
+        await readOnly.selectOption('[name="example"]', { label: 'invalid' })
+        await readOnly.waitForSelector('.grid td[data-record="2"]', { timeout: 120_000 })
+        await readOnly.dblclick('td[data-record="2"][data-column="3"]')
+        await readOnly.keyboard.press('Enter')
+        expect(await readOnly.$('.cell-input')).toBeNull()
+        expect(await readOnly.$('.add-row')).toBeNull()
+        expect(await readOnly.getAttribute('.grid', 'aria-readonly')).toBe('true')
+      } finally {
+        await readOnly.close()
+      }
+    })
+
+    test('empties text typed before it became read-only', async () => {
+      const readOnly = await browser.newPage()
+      try {
+        await readOnly.goto(`${origin}/`)
+        await readOnly.fill('[name="data"]', '{ "mine": true }')
+        await readOnly.evaluate(() => {
+          const el = document.querySelector('data-standard-validator') as HTMLElement & { config: object }
+          el.config = { ...el.config, readOnly: true }
+        })
+        await readOnly.waitForFunction(() => document.querySelector('data-standard-validator')!.shadowRoot!
+          .querySelector<HTMLTextAreaElement>('[name="data"]')!.readOnly)
+        expect(await readOnly.inputValue('[name="data"]')).toBe('')
+      } finally {
+        await readOnly.close()
+      }
+    })
+
+    test('opens a linked example only if it is one of the configured ones', async () => {
+      const listed = await open('?example=fixtures/valid.jsonld')
+      try {
+        await listed.waitForSelector('.verdict', { timeout: 120_000 })
+        expect(await listed.inputValue('[name="data"]')).toContain('Ada Lovelace')
+      } finally {
+        await listed.close()
+      }
+      // A JSON file the demo serves, but not one of its examples.
+      const unlisted = await open('?example=fixtures/context.jsonld')
+      try {
+        await unlisted.waitForTimeout(500)
+        expect(await unlisted.inputValue('[name="data"]')).toBe('')
+      } finally {
+        await unlisted.close()
+      }
+    })
+  })
+
   test('the browser logged no errors throughout', () => {
     expect(consoleErrors).toEqual([])
   })

@@ -206,6 +206,15 @@ export class DataStandardValidator extends LitElement {
       this.exampleUrl = ''
       this.ref = this.config !== undefined ? defaultRef(this.config) ?? '' : ''
       this.loadRefs()
+      // Text typed under an earlier, editable config is not an example, and
+      // could no longer be changed or cleared.
+      if (this.readOnly) {
+        this.exampleToken += 1
+        this.stash = { json: '', csv: '' }
+        this.exampleText = undefined
+        this.setText('')
+        this.results = undefined
+      }
       if (!this.linked) this.applyLink()
       if (this.standard !== undefined && !formatsOf(this.standard).includes(this.format)) this.switchFormat('json')
       this.loadCsvwSummary()
@@ -268,7 +277,15 @@ export class DataStandardValidator extends LitElement {
     this.standardIndex = match.standardIndex
     if (match.ref !== undefined) this.ref = match.ref
     if (link.csvMetadata !== undefined) this.switchFormat('csv')
-    if (match.example !== undefined) this.loadExample(match.example)
+    if (match.example === undefined) return
+    // A link may name any URL as its example; read-only means only the configured ones.
+    const listed = exampleList(config.standards[match.standardIndex]!).some((e) => e.url === match.example)
+    if (!this.readOnly || listed) this.loadExample(match.example)
+  }
+
+  /** Only the configured examples can be shown; see `ValidatorConfig.readOnly`. */
+  private get readOnly (): boolean {
+    return this.config?.readOnly === true
   }
 
   // -------------------------------------------------------------------------
@@ -337,9 +354,11 @@ export class DataStandardValidator extends LitElement {
     if (this.text.trim() === '') {
       this.results = {
         kind: 'info',
-        text: this.format === 'csv'
-          ? 'Paste a CSV file into the Text view, drop one on the table, or load one of the examples.'
-          : 'Paste a record above, or load one of the examples.',
+        text: this.readOnly
+          ? 'Load one of the examples above.'
+          : this.format === 'csv'
+            ? 'Paste a CSV file into the Text view, drop one on the table, or load one of the examples.'
+            : 'Paste a record above, or load one of the examples.',
       }
       return
     }
@@ -526,7 +545,7 @@ export class DataStandardValidator extends LitElement {
   // -------------------------------------------------------------------------
 
   private startEdit (cell: CellRef): void {
-    if (cell.record < 1 || cell.column < 0) return
+    if (this.readOnly || cell.record < 1 || cell.column < 0) return
     this.focusCell = cell
     const value = this.table.table.records[cell.record]?.[cell.column]?.value ?? ''
     this.editing = { ...cell, value }
@@ -754,8 +773,14 @@ export class DataStandardValidator extends LitElement {
     if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); this.validate() }
   }
 
+  // Only a drop target that cancels dragover is offered the drop; read-only refuses it.
+  private onDragOver (event: DragEvent): void {
+    if (!this.readOnly) event.preventDefault()
+  }
+
   // Drag a file straight onto the editor or the table. Its extension picks the format.
   private onDrop (event: DragEvent): void {
+    if (this.readOnly) return
     const file = event.dataTransfer?.files?.[0]
     if (!file) return
     event.preventDefault()
@@ -839,6 +864,7 @@ export class DataStandardValidator extends LitElement {
   private renderResults (): TemplateResult {
     const results = this.results
     if (!results) {
+      if (this.readOnly) return html`<p class="empty">Choose an example above to validate it.</p>`
       const what = this.format === 'csv' ? 'a file' : 'a record'
       return html`<p class="empty">Validate ${what} to see what needs fixing. Choose an example above to try it out.</p>`
     }
@@ -894,9 +920,12 @@ export class DataStandardValidator extends LitElement {
           <pre class="highlight" aria-hidden="true">${unsafeHTML(coloured)}</pre>
           <textarea name="data" class="input" wrap="off" spellcheck="false"
             aria-label=${csv ? 'CSV to validate' : 'JSON or JSON-LD to validate'}
-            placeholder=${csv
-              ? 'Paste CSV here, with its header row first, or drop a .csv file.'
-              : this.config?.placeholder ?? nothing}
+            ?readonly=${this.readOnly}
+            placeholder=${this.readOnly
+              ? 'Choose an example above.'
+              : csv
+                ? 'Paste CSV here, with its header row first, or drop a .csv file.'
+                : this.config?.placeholder ?? nothing}
             .value=${live(this.text)}
             @input=${this.onInput}
             @scroll=${this.syncScroll}
@@ -904,7 +933,7 @@ export class DataStandardValidator extends LitElement {
             @keyup=${this.updateCaret}
             @click=${this.updateCaret}
             @select=${this.updateCaret}
-            @dragover=${(e: DragEvent) => { e.preventDefault() }}
+            @dragover=${this.onDragOver}
             @drop=${this.onDrop}></textarea>
         </div>
       </div>
@@ -961,12 +990,15 @@ export class DataStandardValidator extends LitElement {
 
     return html`
       <div class="grid-wrap"
-        @dragover=${(e: DragEvent) => { e.preventDefault() }}
+        @dragover=${this.onDragOver}
         @drop=${this.onDrop}>
         ${header === undefined
-          ? html`<p class="grid-empty">Paste CSV into the Text view, drop a .csv file here, or load an example.</p>`
+          ? html`<p class="grid-empty">${this.readOnly
+              ? 'Choose an example above.'
+              : 'Paste CSV into the Text view, drop a .csv file here, or load an example.'}</p>`
           : html`
-            <table class="grid" aria-label="Your CSV data"
+            <table class="grid" aria-label=${this.readOnly ? 'CSV data' : 'Your CSV data'}
+              aria-readonly=${this.readOnly ? 'true' : nothing}
               @click=${this.onCellClick} @dblclick=${this.onCellDblClick} @keydown=${this.onGridKeydown}>
               <thead><tr><th scope="col" class="rownum">#</th>${columns.map(headerCell)}</tr></thead>
               <tbody>${shown.map((record, index) => {
@@ -984,10 +1016,13 @@ export class DataStandardValidator extends LitElement {
               ? html`<p class="grid-more">${hidden} more row${hidden === 1 ? '' : 's'} not shown here. The Text view has every row, and all of them are validated.</p>`
               : nothing}`}
       </div>
-      <div class="editor-foot grid-foot">
-        <button type="button" class="ghost add-row" ?disabled=${header === undefined} @click=${this.onAddRow}>+ Add row</button>
-        <span>Double-click a cell to edit · Drop a .csv file to replace</span>
-      </div>`
+      ${this.readOnly
+        ? nothing
+        : html`
+          <div class="editor-foot grid-foot">
+            <button type="button" class="ghost add-row" ?disabled=${header === undefined} @click=${this.onAddRow}>+ Add row</button>
+            <span>Double-click a cell to edit · Drop a .csv file to replace</span>
+          </div>`}`
   }
 
   private renderEditorPane (): TemplateResult {
@@ -1001,7 +1036,7 @@ export class DataStandardValidator extends LitElement {
     return html`
       <section class="pane editor-pane" aria-labelledby="editor-heading">
         <div class="pane-bar">
-          <h2 id="editor-heading" class="pane-head">Your data</h2>
+          <h2 id="editor-heading" class="pane-head">${this.readOnly ? 'Example data' : 'Your data'}</h2>
           ${csv
             ? html`
               <span class="counts">${rowCount} row${rowCount === 1 ? '' : 's'} · ${columnCount} column${columnCount === 1 ? '' : 's'}</span>
@@ -1012,9 +1047,12 @@ export class DataStandardValidator extends LitElement {
             : nothing}
         </div>
         ${csv && this.view === 'table' ? this.renderTable() : this.renderTextEditor()}
-        <p class="privacy">
-          Your data stays in this browser. Only the shape and ${csv ? 'CSVW mapping' : 'context'} files are downloaded.
-        </p>
+        ${this.readOnly
+          ? nothing
+          : html`
+            <p class="privacy">
+              Your data stays in this browser. Only the shape and ${csv ? 'CSVW mapping' : 'context'} files are downloaded.
+            </p>`}
       </section>`
   }
 
@@ -1041,7 +1079,7 @@ export class DataStandardValidator extends LitElement {
         </div>
         <div class="actions">
           <button type="submit" class="primary validate" ?disabled=${this.busy}>${this.busy ? 'Validating…' : 'Validate'}</button>
-          <button type="button" class="ghost clear" @click=${this.onClear}>Clear</button>
+          ${this.readOnly ? nothing : html`<button type="button" class="ghost clear" @click=${this.onClear}>Clear</button>`}
         </div>
         ${this.renderVersion()}
         <div class="toolbar-info">
